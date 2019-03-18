@@ -1,0 +1,113 @@
+#!/usr/bin/python
+__doc__ = 'GETNSPROPS -- calculate NS observables from EoS data'
+__usage__ = 'getnsprops EoS1.csv,EoS2.csv,...'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '09-2018'
+
+import numpy as np
+from optparse import OptionParser
+from tov import tov
+from constants import rhonuc, c
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-p', '--eospath', default='./eos/', help='path to EoS data, DEFAULT="./dat/eos/"', metavar='eospath')
+parser.add_option('-o', '--outpath', default='./dat/', help='path to output data, DEFAULT="./plt/"', metavar='outpath')
+parser.add_option('-l', '--lims', default='Auto', help='x- and y-range limits for plot (e.g. 5,20,0.5,2.5), DEFAULT=Auto', metavar='lims')
+parser.add_option('-t', '--tag', default='-mr', help='tag for output data file, DEFAULT="_mr"', metavar='tag')
+parser.add_option('-s', '--step', default=1e-4, help='starting step size for radial TOV integration, DEFAULT=1e-4', metavar='stp')
+parser.add_option('-n', '--numpts', default=1e3, help='number of points for radial TOV integration, DEFAULT=1e3', metavar='pts')
+parser.add_option('-r', '--maxr', default=2e6, help='radius endpoint in cm for surface finding algorithm, DEFAULT=2e6', metavar='maxr')
+parser.add_option('-T', '--tol', default=1e-4, help='tolerance for surface finding algorithm, DEFAULT=1e-4', metavar='tol')
+parser.add_option('-i', '--rhoi', default=1., help='minimum value for central density in rhonuc, DEFAULT=0.5', metavar='rhoi')
+parser.add_option('-f', '--rhof', default=1e1, help='maximum value for central density in rhonuc, DEFAULT=10', metavar='rhof')
+parser.add_option('-N', '--numrhoc', default=5e1, help='number of central densities to sample per EoS, DEFAULT=20', metavar='num')
+parser.add_option('-P', '--makeplot', default=False, help='boolean to plot NS properties or not, DEFAULT=False', metavar='makeplot')
+parser.add_option('-L', '--tiddef', default=False, help='boolean to calculate tidal deformability or not, DEFAULT=False', metavar='tiddef')
+
+opts, args = parser.parse_args()
+eospath = str(opts.eospath)
+outpath = str(opts.outpath)
+lims = str(opts.lims).split(',')
+tag = str(opts.tag)
+stp = float(opts.step)
+pts = float(opts.numpts)
+maxr = float(opts.maxr)
+tol = float(opts.tol)
+rhoi = float(opts.rhoi)
+rhof = float(opts.rhof)
+num = float(opts.numrhoc)
+makeplot = str(opts.makeplot)
+tiddef = str(opts.tiddef)
+eosnames = str(args[0])
+
+if makeplot=='True':
+
+	import matplotlib
+	matplotlib.use('Agg')
+	import matplotlib.pyplot as plt
+
+	plt.figure(1,figsize=(10.,10.))
+	plt.xlabel("R [km]", fontsize = 28)
+	plt.ylabel(r'$M$ [$M_{\odot}$]', fontsize = 28)
+
+	if len(lims)>1:
+
+		xlims = [float(lims[0]),float(lims[1])]
+		ylims = [float(lims[2]),float(lims[3])]
+	
+		plt.xlim(xlims[0],xlims[1])
+		plt.ylim(ylims[0],ylims[1])
+
+# CALCULATE NS PROPERTIES FOR EACH EOS
+
+eosnames = eosnames.split(',')
+rhocs = np.linspace(rhoi*rhonuc,rhof*rhonuc,num)
+
+for eosname in eosnames:
+
+	eosloc = eospath+eosname
+	outfile = open(outpath+eosname.split('.')[0]+tag+".csv","w")
+	outfile.write('rhoc,M,R \n')
+	
+	Mdat = []
+	Rdat = []
+	Lambdadat = []
+	for rhoc in rhocs:
+	
+		if tiddef=='True':
+			M,R,Lambda = tov(eosloc,rhoc,stp,pts,maxr,tol)
+			Lambdadat.append(Lambda)
+		else:
+			M,R = tov(eosloc,rhoc,stp,pts,maxr,tol)
+		
+		Mdat.append(M)
+		Rdat.append(R)
+
+		if tiddef=='True':
+			outfile.write('{0},{1},{2},{3} \n'.format(rhoc,M,R,Lambda))
+		else:
+			outfile.write('{0},{1},{2} \n'.format(rhoc,M,R))
+
+# MAKE PLOT
+
+	if makeplot=='True':
+	
+		plt.plot(Rdat,Mdat,lw=2,label=eosname.split('.')[0])
+
+if makeplot=='True':
+
+	plt.legend(loc=0)
+	plt.savefig(outpath+'eos'+tag+'.png')
+
+if tiddef=='True' and makeplot=='True':
+
+	plt.figure(2,figsize=(10.,10.))
+	plt.xlabel(r'$M$ [$M_{\odot}$]', fontsize = 28)
+	plt.ylabel(r'$\log_{10}\Lambda$', fontsize = 28)
+
+	for eosname in eosnames:
+	
+		plt.plot(Mdat,np.log10(Lambdadat),lw=2,label=eosname.split('.')[0])
+		
+	plt.legend(loc=0)
+	plt.savefig(outpath+'Lambda'+tag+'.png')
