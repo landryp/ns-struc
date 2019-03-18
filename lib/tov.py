@@ -9,8 +9,6 @@ from constants import G,c,Msun,rhonuc
 
 # DEFINE TOV AND PERTURBATION EQUATIONS
 
-#pos = dict(props[i]=i for i in range(len(props)))
-
 def hydro(r,y,*args): # hydrostatic equilibrium
 
 	props = args[-1]
@@ -146,4 +144,3 @@ def tov(eosloc,rhoc,props='R,M',stp=1e-4,pts=1e3,maxr=2e6,tol=1e-4):
 	
 	return [units[prop](vals) for prop in props]
 
-print tov("../eos/pwp_1.csv",6e14,'Lambda,M,R')

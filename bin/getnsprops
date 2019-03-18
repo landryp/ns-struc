@@ -9,20 +9,24 @@ from optparse import OptionParser
 from tov import tov
 from constants import rhonuc, c
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 parser = OptionParser(usage=__usage__, description=__doc__)
 parser.add_option('-p', '--eospath', default='./eos/', help='path to EoS data, DEFAULT="./dat/eos/"', metavar='eospath')
 parser.add_option('-o', '--outpath', default='./dat/', help='path to output data, DEFAULT="./plt/"', metavar='outpath')
-parser.add_option('-l', '--lims', default='Auto', help='x- and y-range limits for plot (e.g. 5,20,0.5,2.5), DEFAULT=Auto', metavar='lims')
-parser.add_option('-t', '--tag', default='-mr', help='tag for output data file, DEFAULT="_mr"', metavar='tag')
+parser.add_option('-l', '--lims', default='0.5,2.5', help='M range limits for plot, DEFAULT="0.5,2.5"', metavar='lims')
+parser.add_option('-t', '--tag', default='macro-', help='tag for output data file, DEFAULT="macro-"', metavar='tag')
 parser.add_option('-s', '--step', default=1e-4, help='starting step size for radial TOV integration, DEFAULT=1e-4', metavar='stp')
 parser.add_option('-n', '--numpts', default=1e3, help='number of points for radial TOV integration, DEFAULT=1e3', metavar='pts')
 parser.add_option('-r', '--maxr', default=2e6, help='radius endpoint in cm for surface finding algorithm, DEFAULT=2e6', metavar='maxr')
 parser.add_option('-T', '--tol', default=1e-4, help='tolerance for surface finding algorithm, DEFAULT=1e-4', metavar='tol')
-parser.add_option('-i', '--rhoi', default=1., help='minimum value for central density in rhonuc, DEFAULT=0.5', metavar='rhoi')
+parser.add_option('-i', '--rhoi', default=1., help='minimum value for central density in rhonuc, DEFAULT=1.', metavar='rhoi')
 parser.add_option('-f', '--rhof', default=1e1, help='maximum value for central density in rhonuc, DEFAULT=10', metavar='rhof')
-parser.add_option('-N', '--numrhoc', default=5e1, help='number of central densities to sample per EoS, DEFAULT=20', metavar='num')
-parser.add_option('-P', '--makeplot', default=False, help='boolean to plot NS properties or not, DEFAULT=False', metavar='makeplot')
-parser.add_option('-L', '--tiddef', default=False, help='boolean to calculate tidal deformability or not, DEFAULT=False', metavar='tiddef')
+parser.add_option('-N', '--numrhoc', default=5e1, help='number of central densities to sample per EoS, DEFAULT=50', metavar='num')
+parser.add_option('-m', '--makeplot', default=False, help='boolean to plot NS properties or not, DEFAULT=False', metavar='makeplot')
+parser.add_option('-P', '--props', default='R,M,Lambda', help='list of NS properties to calculate, DEFAULT="R,M,Lambda"', metavar='props')
 
 opts, args = parser.parse_args()
 eospath = str(opts.eospath)
@@ -30,84 +34,75 @@ outpath = str(opts.outpath)
 lims = str(opts.lims).split(',')
 tag = str(opts.tag)
 stp = float(opts.step)
-pts = float(opts.numpts)
+pts = int(opts.numpts)
 maxr = float(opts.maxr)
 tol = float(opts.tol)
 rhoi = float(opts.rhoi)
 rhof = float(opts.rhof)
-num = float(opts.numrhoc)
+num = int(opts.numrhoc)
 makeplot = str(opts.makeplot)
-tiddef = str(opts.tiddef)
+props = str(opts.props)
+propslist = props.split(',')
 eosnames = str(args[0])
-
-if makeplot=='True':
-
-	import matplotlib
-	matplotlib.use('Agg')
-	import matplotlib.pyplot as plt
-
-	plt.figure(1,figsize=(10.,10.))
-	plt.xlabel("R [km]", fontsize = 28)
-	plt.ylabel(r'$M$ [$M_{\odot}$]', fontsize = 28)
-
-	if len(lims)>1:
-
-		xlims = [float(lims[0]),float(lims[1])]
-		ylims = [float(lims[2]),float(lims[3])]
-	
-		plt.xlim(xlims[0],xlims[1])
-		plt.ylim(ylims[0],ylims[1])
 
 # CALCULATE NS PROPERTIES FOR EACH EOS
 
 eosnames = eosnames.split(',')
 rhocs = np.linspace(rhoi*rhonuc,rhof*rhonuc,num)
 
+j = 0
 for eosname in eosnames:
 
 	eosloc = eospath+eosname
-	outfile = open(outpath+eosname.split('.')[0]+tag+".csv","w")
-	outfile.write('rhoc,M,R \n')
+	outfile = open(outpath+tag+eosname.split('.')[0]+".csv","w")
+	outfile.write('rhoc,'+props+'\n')
 	
-	Mdat = []
-	Rdat = []
-	Lambdadat = []
+	properties = np.zeros((num,len(propslist)+1))
+	
+	i = 0
 	for rhoc in rhocs:
 	
-		if tiddef=='True':
-			M,R,Lambda = tov(eosloc,rhoc,stp,pts,maxr,tol)
-			Lambdadat.append(Lambda)
-		else:
-			M,R = tov(eosloc,rhoc,stp,pts,maxr,tol)
-		
-		Mdat.append(M)
-		Rdat.append(R)
+		macro = tov(eosloc,rhoc,props,stp,pts,maxr,tol)
+		properties[i] = [item for List in [[rhoc],macro] for item in List]
+		i = i+1
 
-		if tiddef=='True':
-			outfile.write('{0},{1},{2},{3} \n'.format(rhoc,M,R,Lambda))
-		else:
-			outfile.write('{0},{1},{2} \n'.format(rhoc,M,R))
+	np.savetxt(outfile,properties,delimiter=',')
 
 # MAKE PLOT
 
 	if makeplot=='True':
 	
-		plt.plot(Rdat,Mdat,lw=2,label=eosname.split('.')[0])
+		j = j+1
 
-if makeplot=='True':
-
-	plt.legend(loc=0)
-	plt.savefig(outpath+'eos'+tag+'.png')
-
-if tiddef=='True' and makeplot=='True':
-
-	plt.figure(2,figsize=(10.,10.))
-	plt.xlabel(r'$M$ [$M_{\odot}$]', fontsize = 28)
-	plt.ylabel(r'$\log_{10}\Lambda$', fontsize = 28)
-
-	for eosname in eosnames:
+		fig = plt.figure(1,figsize=(10.,10.))
+		fig.subplots_adjust(hspace=0., wspace=0.)
 	
-		plt.plot(Mdat,np.log10(Lambdadat),lw=2,label=eosname.split('.')[0])
+		Mdat = properties[:,propslist.index('M')+1]
+		Rdat = properties[:,propslist.index('R')+1]
+	
+		plt1 = plt.subplot(len(propslist)-1,1,1)
+	
+		plt1.set_xlabel(r'$M$ $[M_{\odot}]$', fontsize = 28)	
+		plt1.set_ylabel(r'$R$ $\mathrm{[km]}$', fontsize = 28)
+		if len(propslist) > 2:
+			plt1.set_xticks([],[])
+		plt1.plot(Mdat,Rdat,lw=2,label=eosname.split('.')[0])
+		plt1.legend(loc=0)
+
+		Mlims = [float(lims[0]),float(lims[1])]
+		plt1.set_xlim(Mlims[0],Mlims[1])
 		
-	plt.legend(loc=0)
-	plt.savefig(outpath+'Lambda'+tag+'.png')
+		if 'Lambda' in props:
+	
+			Lambdadat = properties[:,propslist.index('Lambda')+1]
+
+			plt2 = plt.subplot(len(propslist)-1,1,2)
+			plt2.set_xlabel(r'$M$ $[M_{\odot}]$', fontsize = 28)
+			plt2.set_ylabel(r'$\Lambda$', fontsize = 28)
+			plt2.set_yscale('log')
+			plt2.plot(Mdat,Lambdadat,lw=2,label=eosname.split('.')[0])
+	
+			plt2.set_xlim(Mlims[0],Mlims[1])
+
+		plt.savefig(outpath+tag+eosname.split('.')[0]+'.png')
+		plt.close()
