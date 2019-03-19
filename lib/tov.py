@@ -95,7 +95,7 @@ def tov(eosloc,rhoc,props='R,M',stp=1e-4,pts=1e3,maxr=2e6,tol=1e-4):
 	sols = np.zeros((len(props)+1,pts))
 	i=-1
 	
-	while res.successful() and res.y[props.index('R')] >= tol:
+	while res.successful() and res.y[props.index('R')] >= tol and i < pts-1:
 
 		i = i+1
 		res.integrate(res.t+dt)

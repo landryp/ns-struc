@@ -1,0 +1,49 @@
+#!/usr/bin/python
+__doc__ = 'GETNSPROPS -- look up macroscopic EoS observables like Mmax, R_1.4, etc.'
+__usage__ = 'getmacro macro-EoS1.csv,macro-EoS2.csv,...'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '03-2019'
+
+import numpy as np
+from optparse import OptionParser
+from scipy.interpolate import interp1d
+from macro import macro
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-p', '--propspath', default='./dat/', help='path to NS properties data, DEFAULT="./dat/"', metavar='propspath')
+parser.add_option('-o', '--outpath', default='./dat/', help='path to output data, DEFAULT="./dat/"', metavar='outpath')
+parser.add_option('-t', '--tag', default='canon', help='tag for output data file, DEFAULT="macro-"', metavar='tag')
+parser.add_option('-P', '--prop', default='M=1.4', help='input property for lookup of other NS properties (number or max/min), DEFAULT="M=1.4"', metavar='prop')
+
+opts, args = parser.parse_args()
+propspath = str(opts.propspath)
+outpath = str(opts.outpath)
+tag = str(opts.tag)
+prop = str(opts.prop)
+eosnames = str(args[0])
+
+# INTERPOLATE MASS RELATIONS FOR EACH EOS
+
+eosnames = eosnames.split(',')
+properties = np.genfromtxt(propspath+eosnames[0],names=True,delimiter=',')
+propslist = list(properties.dtype.names)
+
+outfile = open(outpath+tag+".csv","w")
+outlist = 'EoS,rhoc,M,R'
+if 'Lambda' in propslist:
+	
+	outlist = outlist+',Lambda'
+outfile.write(outlist+'\n')
+
+for eosname in eosnames:
+
+	propsloc = propspath+eosname
+	
+	props = macro(propsloc,prop)
+
+# RETURN PROPERTIES AT TARGET VALUE
+
+	props = [str(item) for item in props]
+	props.insert(0,eosname)
+	outfile.write(','.join(props)+'\n')
+
