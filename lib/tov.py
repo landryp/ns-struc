@@ -47,7 +47,7 @@ def equad(r,y,*args): # gravitoelectric quadrupole tidal perturbation
 
 # INTERPOLATE FLUID VARIABLES FROM EOS DATA
 
-def tov(eosloc,rhoc,props='R,M',stp=1e-4,pts=1e3,maxr=2e6,tol=1e-4):
+def tov(eosloc,rhoc,props='R,M',stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
 
 	props = props.split(',')
 	eqs = dict(R=hydro,M=mass,Lambda=equad)
