@@ -1,0 +1,93 @@
+#!/usr/bin/python
+__doc__ = 'COMPAREPROPS -- produce diagnostic plot of differences in M-R, M-Lambda, ... relations between EoS1, EoS2, ...'
+__usage__ = 'compareprops macro-EoS1.csv,macro-EoS2.csv,...'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '03-2019'
+
+import numpy as np
+from optparse import OptionParser
+from pltsetup import *
+from scipy.interpolate import interp1d
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-p', '--props', default='rhoc,R,Lambda', help='comma-separated list of NS properties to plot vs M, DEFAULT=rhoc,R,Lambda', metavar='rhoc,R,Lambda')
+parser.add_option('-l', '--lims', default='0.5,3.0', help='comma-separated M range for plot x-axis, DEFAULT=0.5,3.0', metavar='0.5,3.0')
+parser.add_option('-x', action='store_false', default=True, help='make separate figures instead of subplots with shared x-axis, DEFAULT="subplots=True"', dest='sharex')
+parser.add_option('-d', '--dir', default='./dat/', help='path to directory housing NS properties data, DEFAULT=./dat/', metavar='./dat/')
+parser.add_option('-o', '--outdir', default='./plt/', help='path to directory for plot output, DEFAULT=./plt/', metavar='./plt/')
+parser.add_option('-t', '--tag', default=True, help='tag to append to output filename, DEFAULT="EoS1_EoS2..."', metavar='"EoS1_EoS2..."')
+parser.add_option('-f', '--pltname', default='compareplot', help='plot output filename (automatically appends .png), DEFAULT=compareplot', metavar='compareplot')
+
+opts, args = parser.parse_args()
+eosnames = str(args[0]).split(',')
+shortnames = [(eosname.split('/')[-1]).split('.')[0] for eosname in eosnames]
+props = str(opts.props).split(',')
+numprops = len(props)
+lims = str(opts.lims).split(',')
+lims = [float(lim) for lim in lims]
+sharex = opts.sharex
+indir = str(opts.dir)
+outdir = str(opts.outdir)
+tag = opts.tag
+if tag==True: tag='_'.join(shortnames)
+pltname = str(opts.pltname)
+
+fig = plt.figure(1)
+fig.subplots_adjust(hspace=0., wspace=0.)
+plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)
+propslabels = {'rhoc': r'$\Delta\rho_c$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$'}
+
+# LOAD NS PROPERTIES FOR REFERENCE EOS (FIRST GIVEN)
+
+eosname = eosnames[0]
+propspath = indir+eosname
+refdat = np.genfromtxt(propspath,names=True,delimiter=',')
+
+# LOAD NS PROPERTIES FOR EACH REMAINING EOS
+
+for eosname in eosnames[1:]:
+
+	shortname = (eosname.split('/')[-1]).split('.')[0]
+
+	propspath = indir+eosname
+	propsdat = np.genfromtxt(propspath,names=True,delimiter=',')
+	
+	for prop in props:
+	
+# CALCULATE FRACTIONAL DIFFERENCE RELATIVE TO REFERENCE EOS'S NS PROPERTIES
+	
+		propfunc=interp1d(propsdat['M'],propsdat[prop],kind='linear', bounds_error=False,fill_value=0)
+		reffunc=interp1d(refdat['M'],refdat[prop],kind='linear',bounds_error=False, fill_value=0) # interpolate M-R, etc. functions for given EoS and ref EoS
+		
+		Mmin = max(min(propsdat['M']),min(refdat['M']))
+		Mmax = min(max(propsdat['M']),max(refdat['M'])) # use range of data common to both EoSs only
+		
+		Mdat = np.linspace(Mmin,Mmax,5e2)
+		fracdiffdat = abs(propfunc(Mdat)-reffunc(Mdat))/reffunc(Mdat) # fractional difference in properties as a function of mass
+
+# PLOT FRACTIONAL DIFFERENCES VS MASS FOR EACH EOS
+	
+		subpltnum = props.index(prop)+1
+		if sharex: subplt = plt.subplot(numprops,1,subpltnum)	# make subplots
+		else:							# or separate figs
+			plt.figure(subpltnum)
+			subplt = plt.subplot(1,1,1)
+		
+		subplt.set_xlabel(r'$M$ $[M_{\odot}]$')
+		subplt.set_xlim(lims[0],lims[1])
+		subplt.set_ylabel(propslabels[prop])
+		subplt.set_xticks([],[])
+		
+		subplt.plot(Mdat,fracdiffdat,lw=2,label=shortname,marker='.')
+		
+		if not sharex: 
+			subplt.xaxis.set_major_locator(AutoLocator())
+			plt.legend(loc=0)
+			plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)		
+			plt.savefig(outdir+pltname+tag+'-'+prop+'.png')
+
+if sharex:
+	subplt.xaxis.set_major_locator(AutoLocator())
+	plt.legend(loc=0)		
+	plt.savefig(outdir+pltname+tag+'.png')
+

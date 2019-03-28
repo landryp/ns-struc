@@ -1,0 +1,81 @@
+#!/usr/bin/python
+__doc__ = 'COMPAREMACRO -- produce diagnostic plot of differences in macroscopic observables (e.g. rhoc,R,Lambda at M=1.4 Msun) across EoSs given separate computations macro1, macro2, ... listing EoSs in same order'
+__usage__ = 'comparemacro macro1.csv,macro2.csv,...'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '03-2019'
+
+import numpy as np
+from optparse import OptionParser
+from pltsetup import *
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-p', '--props', default='rhoc,M,R,Lambda', help='comma-separated list of NS properties to compare, DEFAULT=rhoc,M,R,Lambda', metavar='rhoc,M,R,Lambda')
+parser.add_option('-x', action='store_false', default=True, help='make separate figures instead of subplots with shared x-axis, DEFAULT="subplots=True"', dest='sharex')
+parser.add_option('-d', '--dir', default='./dat/', help='path to directory housing NS properties data, DEFAULT=./dat/', metavar='./dat/')
+parser.add_option('-o', '--outdir', default='./plt/', help='path to directory for plot output, DEFAULT=./plt/', metavar='./plt/')
+parser.add_option('-t', '--tag', default=True, help='tag to append to output filename, DEFAULT="macro1_macro2..."', metavar='"macro1_macro2..."')
+parser.add_option('-f', '--pltname', default='macroplot', help='plot output filename (automatically appends .png), DEFAULT=macroplot', metavar='macroplot')
+
+opts, args = parser.parse_args()
+macronames = str(args[0]).split(',')
+shortnames = [(macroname.split('/')[-1]).split('.')[0] for macroname in macronames]
+props = str(opts.props).split(',')
+numprops = len(props)
+sharex = opts.sharex
+indir = str(opts.dir)
+outdir = str(opts.outdir)
+tag = opts.tag
+if tag==True: tag='_'.join(shortnames)
+pltname = str(opts.pltname)
+
+fig = plt.figure(1)
+fig.subplots_adjust(hspace=0., wspace=0.)
+plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)
+propslabels = {'rhoc': r'$\Delta\rho_c$','M': r'$\Delta M$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$'}
+
+# LOAD NS PROPERTIES FOR REFERENCE TABLE OF MACROSCOPIC OBSERVABLES (FIRST GIVEN)
+
+macroname = macronames[0]
+macropath = indir+macroname
+refdat = np.genfromtxt(macropath,names=True,delimiter=',')
+
+# LOAD MACROSCOPIC OBSERVABLES FROM EACH REMAINING TABLE
+
+for macroname in macronames[1:]:
+
+	shortname = (macroname.split('/')[-1]).split('.')[0]
+
+	macropath = indir+macroname
+	macrodat = np.genfromtxt(macropath,names=True,delimiter=',')
+	
+	for prop in props:
+	
+# CALCULATE FRACTIONAL DIFFERENCE RELATIVE TO REFERENCE TABLE'S OBSERVABLES
+	
+		fracdiffdat = abs(macrodat[prop]-refdat[prop])/refdat[prop] # fractional difference in observables for each EoS in list
+
+# PLOT FRACTIONAL DIFFERENCES VS EOS NUMBER FOR EACH TABLE
+	
+		subpltnum = props.index(prop)+1
+		if sharex: subplt = plt.subplot(numprops,1,subpltnum)	# make subplots
+		else:							# or separate figs
+			plt.figure(subpltnum)
+			subplt = plt.subplot(1,1,1)
+		
+		subplt.set_xlabel(r'$\mathrm{EoS} \, \#$')
+		subplt.set_ylabel(propslabels[prop])
+		subplt.set_xticks([],[])
+		
+		subplt.plot(fracdiffdat,lw=2,label=shortname,marker='.')
+		
+		if not sharex: 
+			subplt.xaxis.set_major_locator(AutoLocator())
+			plt.legend(loc=0)
+			plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)		
+			plt.savefig(outdir+pltname+tag+'-'+prop+'.png')
+
+if sharex:
+	subplt.xaxis.set_major_locator(AutoLocator())
+	plt.legend(loc=0)		
+	plt.savefig(outdir+pltname+tag+'.png')
+
