@@ -31,7 +31,7 @@ pltname = str(opts.pltname)
 
 fig = plt.figure(1)
 fig.subplots_adjust(hspace=0., wspace=0.)
-propslabels = {'rhoc': r'$\rho_c \, [\mathrm{g/cm}^3]$','R': r'$R \, \mathrm{[km]}$','Lambda': r'$\Lambda$'}
+propslabels = {'rhoc': r'$\rho_c \, [\mathrm{g/cm}^3]$','R': r'$R \, \mathrm{[km]}$','Lambda': r'$\Lambda$','I': r'$I \, [10^{45} \, \mathrm{g \, cm}^2]$'}
 
 # LOAD NS PROPERTIES FOR EACH EOS
 

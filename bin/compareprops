@@ -35,7 +35,7 @@ pltname = str(opts.pltname)
 fig = plt.figure(1)
 fig.subplots_adjust(hspace=0., wspace=0.)
 plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)
-propslabels = {'rhoc': r'$\Delta\rho_c$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$'}
+propslabels = {'rhoc': r'$\Delta\rho_c$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$','I': r'$\Delta I$'}
 
 # LOAD NS PROPERTIES FOR REFERENCE EOS (FIRST GIVEN)
 
@@ -56,14 +56,13 @@ for eosname in eosnames[1:]:
 	
 # CALCULATE FRACTIONAL DIFFERENCE RELATIVE TO REFERENCE EOS'S NS PROPERTIES
 	
-		propfunc=interp1d(propsdat['M'],propsdat[prop],kind='linear', bounds_error=False,fill_value=0)
 		reffunc=interp1d(refdat['M'],refdat[prop],kind='linear',bounds_error=False, fill_value=0) # interpolate M-R, etc. functions for given EoS and ref EoS
 		
 		Mmin = max(min(propsdat['M']),min(refdat['M']))
 		Mmax = min(max(propsdat['M']),max(refdat['M'])) # use range of data common to both EoSs only
 		
-		Mdat = np.linspace(Mmin,Mmax,5e2)
-		fracdiffdat = abs(propfunc(Mdat)-reffunc(Mdat))/reffunc(Mdat) # fractional difference in properties as a function of mass
+		Mdat = propsdat['M']
+		fracdiffdat = abs(propsdat[prop]-reffunc(Mdat))/reffunc(Mdat) # fractional difference in properties as a function of mass
 
 # PLOT FRACTIONAL DIFFERENCES VS MASS FOR EACH EOS
 	

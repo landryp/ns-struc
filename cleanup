@@ -3,5 +3,7 @@
 rm -f dat/*.csv
 rm -f dat/*.png
 
+rm -f plt/*.png
+
 
 

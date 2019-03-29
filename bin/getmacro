@@ -19,6 +19,7 @@ parser.add_option('-f', '--filename', default='canon', help='output filename (au
 opts, args = parser.parse_args()
 eosnames = str(args[0]).split(',')
 prop = str(opts.prop)
+var = prop.split('=')[0]
 indir = str(opts.dir)
 outdir = str(opts.outdir)
 tag = str(opts.tag)
@@ -28,9 +29,10 @@ filename = str(opts.filename)
 
 properties = np.genfromtxt(indir+eosnames[0],names=True,delimiter=',')
 props = list(properties.dtype.names)
+props.remove(var)
 
 outfile = open(outdir+filename+tag+".csv","w")
-header = 'EoS,'+','.join(props)+' \n'
+header = 'EoS,'+var+','+','.join(props)+' \n'
 outfile.write(header)
 
 for eosname in eosnames:

@@ -17,11 +17,11 @@ def macro(propspath,inprop='M=1.4'):
 	
 	if val == 'max':
 	
-		val = max(properties(var))
+		val = max(properties[var])
 		
 	elif val == 'min':
 	
-		val = min(properties(var))
+		val = min(properties[var])
 		
 	else:
 	

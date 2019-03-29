@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# COMPARE -- bash script to do convergence test of NS properties at Mmax, 1.4 Msun and 1.338 Msun for whole directory of EoSs directly from EoS data
+# USAGE: compare ./ref/dir/ ./eos/dir/ ./out/dir/
+
+refdir=$1
+indir=$2
+outdir=$3
+
+num[0]=50
+num[1]=100
+num[2]=200
+
+for j in 0 1 2
+do
+	for file in ${indir}*.csv
+	do
+		getnsprops $(basename "$file") -d $indir -o $outdir -p M,R,Lambda,I -t macro$j- -n ${num[j]}
+	done
+
+	i=0
+	for file in ${outdir}macro$j-*.csv
+	do
+		branches[i]=$file
+		i=$(($i+1))
+	done
+
+	branchlist=$(echo ${branches[*]} | sed "s/ /,/g")
+
+	getmacro $branchlist -d "" -o ${outdir}../ -p M=1.4 -f canon -t $j
+	getmacro $branchlist -d "" -o ${outdir}../ -p M=max -f max -t $j
+	getmacro $branchlist -d "" -o ${outdir}../ -p M=1.338 -f psr -t $j
+done
+
+comparemacro ${refdir}canon.csv,${outdir}../canon0.csv,${outdir}../canon1.csv,${outdir}../canon2.csv -d "" -o ./plt/ -t _LALme -f canonplot
+
+comparemacro ${refdir}max.csv,${outdir}../max0.csv,${outdir}../max1.csv,${outdir}../max2.csv -d "" -o ./plt/ -t _LALme -f maxplot
+
+comparemacro ${refdir}psr.csv,${outdir}../psr0.csv,${outdir}../psr1.csv,${outdir}../psr2.csv -d "" -o ./plt/ -t _LALme -f psrplot

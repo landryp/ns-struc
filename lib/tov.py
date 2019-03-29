@@ -12,20 +12,26 @@ def tov(eospath,rhoc,props=['R','M'],stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
 
 	pts = int(pts)
 	eqs = eqsdict() # associate NS properties with corresponding equation of stellar structure
-	
-	eosdat = np.genfromtxt(eospath,names=True,delimiter=',') # load EoS data
-	rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
-	pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
-	mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
 
-	mup = interp1d(pdat,mudat,kind='linear',bounds_error=False,fill_value=0)
-	def mu(p): return mup(p)
+	if len(eospath) == 3:
+	
+		mu, P, cs2i = eospath
+
+	else:	
+	
+		eosdat = np.genfromtxt(eospath,names=True,delimiter=',') # load EoS data
+		rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
+		pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
+		mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
+
+		mup = interp1d(pdat,mudat,kind='linear',bounds_error=False,fill_value=0)
+		def mu(p): return mup(p)
 		
-	prho = interp1d(rhodat,pdat,kind='linear',bounds_error=False,fill_value=0)
-	def P(rho): return prho(rho)
+		prho = interp1d(rhodat,pdat,kind='linear',bounds_error=False,fill_value=0)
+		def P(rho): return prho(rho)
 		
-	cs2pi = interp1d(pdat,np.gradient(mudat,pdat),kind='linear',bounds_error=False, fill_value=0)
-	def cs2i(p): return cs2pi(p) # 1/sound speed squared
+		cs2pi = interp1d(pdat,np.gradient(mudat,pdat),kind='linear', bounds_error=False, fill_value=0)
+		def cs2i(p): return cs2pi(p) # 1/sound speed squared
 
 # PERFORM INTEGRATION OF EQUATIONS OF STELLAR STRUCTURE
 		
@@ -33,7 +39,8 @@ def tov(eospath,rhoc,props=['R','M'],stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
 
 	pc = float(P(rhoc)) # central pressure from interpolated p(rho) function
 	muc = mu(pc) # central energy density from interpolated mu(p) function
-	startvals = initconds(pc,muc,stp,props) # load BCs at center of star for integration
+	cs2ic = cs2i(pc) # central sound speed from interpolated cs2i(p) function
+	startvals = initconds(pc,muc,cs2ic,stp,props) # load BCs at center of star for integration
 	y0 = [startvals[prop] for prop in props]
 	
 	res = ode(efe)

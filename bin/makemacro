@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # MAKEMACRO -- bash script to produce NS properties at Mmax, 1.4 Msun and Mmin for whole directory of EoSs directly from EoS data
-# USAGE: makemacro ./eos/dir/ ./out/dir/
+# USAGE: makemacro ./eos/dir/ ./out/dir/ 50
 
 indir=$1
 outdir=$2
+num=$3
 
 i=0
 for file in ${indir}*.csv
 do
-	getnsprops $(basename "$file") -p $indir -o $outdir -t macro- -N 100 -m True
-	splitbranches "macro-$(basename "$file")" -p $outdir -o $outdir -t branch-
+	getnsprops $(basename "$file") -d $indir -o $outdir -t macro- -n $num
+	splitbranches "macro-$(basename "$file")" -d $outdir -o $outdir -t branch-
 	
 	for subfile in ${outdir}$(basename "$file")/*.csv
 	do
@@ -21,6 +22,5 @@ done
 
 branchlist=$(echo ${branches[*]} | sed "s/ /,/g")
 
-getmacro $branchlist -p "" -o ./ -P M=1.4 -t canon
-getmacro $branchlist -p "" -o ./ -P M=max -t max
-getmacro $branchlist -p "" -o ./ -P M=min -t min
+getmacro $branchlist -d "" -o ${outdir}/../ -p M=1.4 -f canon
+getmacro $branchlist -d "" -o ${outdir}/../ -p M=max -f max

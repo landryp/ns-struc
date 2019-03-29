@@ -31,7 +31,7 @@ pltname = str(opts.pltname)
 fig = plt.figure(1)
 fig.subplots_adjust(hspace=0., wspace=0.)
 plt.suptitle('Fractional errors relative to '+shortnames[0], y=0.95)
-propslabels = {'rhoc': r'$\Delta\rho_c$','M': r'$\Delta M$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$'}
+propslabels = {'rhoc': r'$\Delta\rho_c$','M': r'$\Delta M$','R': r'$\Delta R$','Lambda': r'$\Delta\Lambda$','I': r'$\Delta I$'}
 
 # LOAD NS PROPERTIES FOR REFERENCE TABLE OF MACROSCOPIC OBSERVABLES (FIRST GIVEN)
 
