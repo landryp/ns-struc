@@ -6,7 +6,7 @@ __date__ = '03-2019'
 
 import numpy as np
 from optparse import OptionParser
-from pltsetup import *
+from nsstruc.pltsetup import *
 from scipy.interpolate import interp1d
 
 parser = OptionParser(usage=__usage__, description=__doc__)

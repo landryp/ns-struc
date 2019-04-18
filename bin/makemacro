@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MAKEMACRO -- bash script to produce NS properties at Mmax, 1.4 Msun and Mmin for whole directory of EoSs directly from EoS data
+# MAKEMACRO -- bash script to produce NS properties at Mmax, 1.4 Msun for whole directory of EoSs directly from EoS data
 # USAGE: makemacro ./eos/dir/ ./out/dir/ 50
 
 indir=$1

@@ -6,7 +6,7 @@ __date__ = '03-2019'
 
 import numpy as np
 from optparse import OptionParser
-from pltsetup import *
+from nsstruc.pltsetup import *
 
 parser = OptionParser(usage=__usage__, description=__doc__)
 parser.add_option('-p', '--props', default='rhoc,M,R,Lambda', help='comma-separated list of NS properties to compare, DEFAULT=rhoc,M,R,Lambda', metavar='rhoc,M,R,Lambda')

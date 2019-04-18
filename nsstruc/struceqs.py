@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.special import hyp2f1
-from constants import *
+from .constants import *
 
 # DEFINE TOV AND PERTURBATION EQUATIONS
 

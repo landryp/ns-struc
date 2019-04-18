@@ -7,7 +7,7 @@ __date__ = '03-2019'
 import numpy as np
 from optparse import OptionParser
 from scipy.interpolate import interp1d
-from macro import macro
+from nsstruc.macro import macro
 
 parser = OptionParser(usage=__usage__, description=__doc__)
 parser.add_option('-p', '--prop', default='M=1.4', help='macroscopic observable (M=1.4, R=max, Lambda=min, ...) at which to look up other NS properties, DEFAULT=M=1.4', metavar='M=1.4')

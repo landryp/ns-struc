@@ -3,8 +3,8 @@
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import ode
-from struceqs import *
-from constants import *
+from .struceqs import *
+from .constants import *
 
 # INTERPOLATE CONTINUOUS FLUID VARIABLES FROM DISCRETE EOS DATA
 
