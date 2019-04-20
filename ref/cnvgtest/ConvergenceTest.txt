@@ -1,7 +1,0 @@
-Convergence test run against EOSDB tables with different resolution in rhoc and default other settings for getnsprops. (Key: 0 - numrhoc = 50, 1 - numrhoc = 100, 2 - numrhoc = 200, 3 - numrhoc = 250)
-
-With numrhoc = 200, get Delta Mmax < 0.04% (also Delta Rmax < 0.2%, Delta Lambdamax < 3% with one outlier, Delta Imax < 0.3%); Delta R1.4 < 0.04% and Delta Lambda1.4 < 5% with one outlier (also Delta I1.4 < 0.1%); and Delta I1.338 < 0.1% (also Delta R1.338 < 0.06%, Delta Lambda1.338 < 5% with one outlier).
-
-With numrhoc = 250, get Delta Mmax < 0.04% (also Delta Rmax < 0.1%, Delta Lambdamax < 3% with one outlier, Delta Imax < 0.2%); Delta R1.4 < 0.05% and Delta Lambda1.4 < 5% with one outlier (also Delta I1.4 < 0.03%); and Delta I1.338 < 0.03% (also Delta R1.338 < 0.06%, Delta Lambda1.338 < 5% with one outlier).
-
-Since the next-highest resolution setting returns better-than-tolerable precision in all variables except Lambda, and there is no improvement in Lambda with the highest resolution, it seems best to run with numrhoc = 200.

@@ -42,7 +42,7 @@ tag = str(opts.tag)
 
 for eosname in eosnames:
 
-	shortname = eosname.split('.')[0]
+	shortname = (eosname.split('.')[0]).split('eos-')[-1]
 
 	eospath = indir+eosname
 	outfile = open(outdir+tag+shortname+".csv","w")

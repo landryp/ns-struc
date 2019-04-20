@@ -14,18 +14,23 @@ parser = OptionParser(usage=__usage__, description=__doc__)
 parser.add_option('-d', '--dir', default='./dat/', help='path to directory housing NS properties data, DEFAULT=./dat/', metavar='./dat/')
 parser.add_option('-o', '--outdir', default='./dat/', help='path to output data, DEFAULT=./dat/', metavar='./dat/')
 parser.add_option('-t', '--tag', default='branch-', help='tag for output data file, DEFAULT=branch-', metavar='branch-')
+parser.add_option('-f', '--foldername', default=False, help='output data folder name, DEFAULT=Auto', metavar='eos')
 
 opts, args = parser.parse_args()
 eosnames = str(args[0]).split(',')
 indir = str(opts.dir)
 outdir = str(opts.outdir)
 tag = str(opts.tag)
+foldername = opts.foldername
 
 # LOAD NS PROPERTIES DATA FOR EACH EOS
 
 for eosname in eosnames:
 
-	shortname = (eosname.split('-')[1]).split('.')[0]
+	if foldername == False:
+		shortname = (eosname.split('-')[1]).split('.')[0]
+	else:
+		shortname = foldername
 	outdir = outdir+shortname+'/'
 	if not os.path.exists(outdir): os.makedirs(outdir)
 
