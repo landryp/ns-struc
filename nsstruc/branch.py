@@ -9,8 +9,8 @@ def branch(propspath):
 
 	properties = np.genfromtxt(propspath,names=True,delimiter=',')
 
-	rhocdat = np.flip(properties['rhoc'],0) # decreasing rhoc list
-	Mdat = np.flip(properties['M'],0) # forward differences skip min mass, not max
+	rhocdat = properties['rhoc'][::-1] # decreasing rhoc list
+	Mdat = properties['M'][::-1] # forward differences skip min mass, not max
 	
 	dMdrhoc = np.diff(Mdat)/np.diff(rhocdat) # grad of M vs rhoc, positive means stable
 	datlen = len(dMdrhoc)
@@ -26,4 +26,4 @@ def branch(propspath):
 	
 	critpts = np.append(critpts,datlen) # includes start and end points
 	
-	return [np.flip(datlen-critpts,0),np.flip(signs,0)] # undo flip; stable still positive sign
+	return [(datlen-critpts)[::-1],signs[::-1]] # undo flip; stable still positive sign
