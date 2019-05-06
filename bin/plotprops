@@ -1,6 +1,6 @@
 #!/usr/bin/python
-__doc__ = 'PLOTPROPS -- produce diagnostic plot of M-R, M-Lambda, ... relations for EoS1, EoS2, ...'
-__usage__ = 'plotprops macro-EoS1.csv,macro-EoS2.csv,...'
+__doc__ = 'PLOTPROPS -- plot NS properties as a function of mass for selected EoSs'
+__usage__ = 'plotprops macro-EoS1.csv,macro-EoS2.csv,... [-v] [-p rhoc,R,Lambda,...] [-l 0.5,3.0] [-d ./dat/] [-o ./dat/]'
 __author__ = 'philippe.landry@ligo.org'
 __date__ = '03-2019'
 
@@ -16,6 +16,7 @@ parser.add_option('-d', '--dir', default='./dat/', help='path to directory housi
 parser.add_option('-o', '--outdir', default='./plt/', help='path to directory for plot output, DEFAULT=./plt/', metavar='./plt/')
 parser.add_option('-t', '--tag', default='', help='tag to append to output filename, DEFAULT=None', metavar='""')
 parser.add_option('-f', '--pltname', default='propsplot', help='plot output filename (automatically appends .png), DEFAULT=propsplot', metavar='propsplot')
+parser.add_option('-v', '--verbose', action='store_true', default=False, help='toggle verbose output, DEFAULT=False', metavar='False')
 
 opts, args = parser.parse_args()
 eosnames = str(args[0]).split(',')
@@ -28,22 +29,25 @@ indir = str(opts.dir)
 outdir = str(opts.outdir)
 tag = str(opts.tag)
 pltname = str(opts.pltname)
+verb = opts.verbose
 
 fig = plt.figure(1)
 fig.subplots_adjust(hspace=0., wspace=0.)
-propslabels = {'rhoc': r'$\rho_c \, [\mathrm{g/cm}^3]$','R': r'$R \, \mathrm{[km]}$','Lambda': r'$\Lambda$','I': r'$I \, [10^{45} \, \mathrm{g \, cm}^2]$'}
+propslabels = {'rhoc': r'$\rho_c \, [\mathrm{g/cm}^3]$','R': r'$R \, \mathrm{[km]}$','Lambda': r'$\Lambda$','I': r'$I \, [10^{45} \, \mathrm{g \, cm}^2]$','Mb': r'$M_b \, [M_{\odot}]$'}
 
 # LOAD NS PROPERTIES FOR EACH EOS
 
 for eosname in eosnames:
 
 	shortname = (eosname.split('/')[-1]).split('.')[0]
+	if verb == True: print 'Look up properties of '+str(shortname)+' stars'
 
 	propspath = indir+eosname
 	propsdat = np.genfromtxt(propspath,names=True,delimiter=',')
 
 # PLOT NS PROPERTIES VS MASS FOR EACH EOS
 	
+	if verb == True: print 'Plotting observables vs mass for '+str(shortname)+' stars'
 	for prop in props:
 	
 		subpltnum = props.index(prop)+1
@@ -66,6 +70,10 @@ for eosname in eosnames:
 			subplt.xaxis.set_major_locator(AutoLocator())
 			plt.legend(loc=0)		
 			plt.savefig(outdir+pltname+tag+'-'+prop+'.png')
+			
+		if verb == True: print 'Done '+str(prop)+'-M relation'
+	
+	if verb == True: print 'Done all relations'
 
 if sharex:
 	subplt.xaxis.set_major_locator(AutoLocator())

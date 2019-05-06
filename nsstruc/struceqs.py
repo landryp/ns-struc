@@ -8,7 +8,7 @@ from .constants import *
 
 def hydro(r,y,*args): # hydrostatic equilibrium
 
-	props = args[-1]
+	props = args[-1] # args expected as mu(p),1/cs2(p),rho(p),props
 
 	p = y[props.index('R')] # p in units of g/cm^3
 	m = y[props.index('M')] # m in units of cm*c^2/G
@@ -21,10 +21,21 @@ def mass(r,y,*args): # definition of the mass
 	props = args[-1]
 	
 	p = y[props.index('R')] # p in units of g/cm^3
-	m = y[props.index('M')] # m in units of cm*c^2/G
 	mu = args[0] # mu in units of g/cm^3	
 		
 	return 4.*np.pi*r**2*mu(p) 
+	
+def baryonmass(r,y,*args): # definition of the baryonic mass
+	
+	props = args[-1]
+	
+	p = y[props.index('R')] # p in units of g/cm^3
+	m = y[props.index('M')] # m in units of cm*c^2/G
+	rho = args[2] # rho in units of g/cm^3	
+	
+	f = 1.-2.*G*m/(c**2*r)
+		
+	return 4.*np.pi*r**2*rho(p)/f**0.5 
 	
 def equad(r,y,*args): # gravitoelectric quadrupole tidal perturbation
 	
@@ -58,16 +69,21 @@ def slowrot(r,y,*args): # slow rotation equation
 
 def eqsdict(): # dictionary linking NS properties with corresponding equation of stellar structure
 
-	return {'R': hydro,'M': mass,'Lambda': equad,'I': slowrot}
+	return {'R': hydro,'M': mass,'Lambda': equad,'I': slowrot,'Mb': baryonmass}
 
-def initconds(pc,muc,cs2ic,stp,props): # initial conditions for integration of eqs of stellar structure
+# INITIAL CONDITIONS
+
+def initconds(pc,muc,cs2ic,rhoc,stp,props): # initial conditions for integration of eqs of stellar structure
 
 	Pc = pc - 2.*np.pi*G*stp**2*(pc+muc)*(3.*pc+muc)/(3.*c**2)
 	mc = 4.*np.pi*stp**3*muc/3.
 	Lambdac = 2.+4.*np.pi*G*stp**2*(9.*pc+13.*muc+3.*(pc+muc)*cs2ic)/(21.*c**2)
 	omegac = 0.+16.*np.pi*G*stp**2*(pc+muc)/(5.*c**2)
+	mbc = 4.*np.pi*stp**3*rhoc/3.
 	
-	return {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac}
+	return {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
+
+# SURFACE VALUES
 
 def calcobs(vals,props): # calculate NS properties at stellar surface in desired units, given output surficial values from integrator
 
@@ -82,6 +98,12 @@ def calcobs(vals,props): # calculate NS properties at stellar surface in desired
 		M = vals[props.index('M')+1]
 	
 		return M/Msun
+		
+	def MbMsun(vals): # M in Msun
+	
+		Mb = vals[props.index('Mb')+1]
+	
+		return Mb/Msun
 		
 	def Lambda1(vals): # dimensionless tidal deformability
 	
@@ -110,4 +132,4 @@ def calcobs(vals,props): # calculate NS properties at stellar surface in desired
 	
 		return 1e-45*(omegaR/(3.+omegaR))*c**2*vals[0]**3/(2.*G) # MoI in 10^45 g cm^2
 
-	return {'R': Rkm,'M': MMsun,'Lambda': Lambda1,'I': MoI}	
+	return {'R': Rkm,'M': MMsun,'Lambda': Lambda1,'I': MoI, 'Mb': MbMsun}	

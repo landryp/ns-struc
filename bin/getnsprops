@@ -1,6 +1,6 @@
 #!/usr/bin/python
-__doc__ = 'GETNSPROPS -- calculate NS properties from EoS data for EoS1, EoS2, ...'
-__usage__ = 'getnsprops EoS1.csv,EoS2.csv,...'
+__doc__ = 'GETNSPROPS -- calculate NS properties as a function of central density for selected EoSs'
+__usage__ = 'getnsprops EoS1.csv,EoS2.csv,... [-v] [-p R,M,Lambda,...] [-n 200] [-r 0.8,12] [-d ./eos/] [-o ./dat/]'
 __author__ = 'philippe.landry@ligo.org'
 __date__ = '03-2019'
 
@@ -22,6 +22,7 @@ parser.add_option('-T', '--tol', default=1e1, help='pressure tolerance for surfa
 parser.add_option('-d', '--dir', default='./eos/', help='path to directory housing EoS data, DEFAULT=./eos/', metavar='./eos/')
 parser.add_option('-o', '--outdir', default='./dat/', help='path to output directory, DEFAULT=./dat/', metavar='./dat/')
 parser.add_option('-t', '--tag', default='macro-', help='tag for output data file, DEFAULT=macro-', metavar='macro-')
+parser.add_option('-v', '--verbose', action='store_true', default=False, help='toggle verbose output, DEFAULT=False', metavar='False')
 
 opts, args = parser.parse_args()
 eosnames = str(args[0]).split(',')
@@ -37,12 +38,14 @@ tol = float(opts.tol)
 indir = str(opts.dir)
 outdir = str(opts.outdir)
 tag = str(opts.tag)
+verb = opts.verbose
 
 # CALCULATE NS PROPERTIES FOR EACH EOS
 
 for eosname in eosnames:
 
 	shortname = (eosname.split('.')[0]).split('eos-')[-1]
+	if verb == True: print 'Calculate properties of '+str(shortname)+' stars'
 
 	eospath = indir+eosname
 	outfile = open(outdir+tag+shortname+".csv","w")
@@ -52,6 +55,9 @@ for eosname in eosnames:
 	rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
 	pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
 	mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
+	
+	rhop = interp1d(pdat,rhodat,kind='linear',bounds_error=False,fill_value=0)
+	def Rho(p): return rhop(p)
 	
 	mup = interp1d(pdat,mudat,kind='linear',bounds_error=False,fill_value=0)
 	def mu(p): return mup(p)
@@ -67,10 +73,12 @@ for eosname in eosnames:
 	properties = np.zeros((numrhoc,numprops+1))
 	
 	i = 0
-	for rhoc in rhocs:
+	if verb == True: print 'Start at central density {0} g/cm^3'.format(rhocs[0])
+	for rhoc in rhocs: # compute macroscopic properties for star of each central density
 	
-		macro = tov([mu,P,cs2i],rhoc,props,stp,numpts,maxr,tol)
+		macro = tov([mu,P,cs2i,Rho],rhoc,props,stp,numpts,maxr,tol)
 		properties[i] = [item for List in [[rhoc],macro] for item in List]
 		i = i+1
 
+	if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
 	np.savetxt(outfile,properties,delimiter=',')

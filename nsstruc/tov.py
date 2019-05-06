@@ -8,14 +8,14 @@ from .constants import *
 
 # INTERPOLATE CONTINUOUS FLUID VARIABLES FROM DISCRETE EOS DATA
 
-def tov(eospath,rhoc,props=['R','M'],stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
+def tov(eospath,rhoc,props=['R','M','Lambda'],stp=1e1,pts=2e3,maxr=2e6,tol=1e1):
 
 	pts = int(pts)
 	eqs = eqsdict() # associate NS properties with corresponding equation of stellar structure
 
-	if len(eospath) == 3:
+	if len(eospath) == 4: # pass pre-interpolated fluid variables instead of table path
 	
-		mu, P, cs2i = eospath
+		mu, P, cs2i, Rho = eospath
 
 	else:	
 	
@@ -23,6 +23,9 @@ def tov(eospath,rhoc,props=['R','M'],stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
 		rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
 		pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
 		mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
+
+		rhop = interp1d(pdat,rhodat,kind='linear',bounds_error=False,fill_value=0)
+		def Rho(p): return rhop(p)
 
 		mup = interp1d(pdat,mudat,kind='linear',bounds_error=False,fill_value=0)
 		def mu(p): return mup(p)
@@ -35,12 +38,12 @@ def tov(eospath,rhoc,props=['R','M'],stp=1e1,pts=1e3,maxr=2e6,tol=1e1):
 
 # PERFORM INTEGRATION OF EQUATIONS OF STELLAR STRUCTURE
 		
-	def efe(r,y): return [eqs[prop](r,y,mu,cs2i,props) for prop in props]
+	def efe(r,y): return [eqs[prop](r,y,mu,cs2i,Rho,props) for prop in props]
 
 	pc = float(P(rhoc)) # central pressure from interpolated p(rho) function
 	muc = mu(pc) # central energy density from interpolated mu(p) function
 	cs2ic = cs2i(pc) # central sound speed from interpolated cs2i(p) function
-	startvals = initconds(pc,muc,cs2ic,stp,props) # load BCs at center of star for integration
+	startvals = initconds(pc,muc,cs2ic,rhoc,stp,props) # load BCs at center of star for integration
 	y0 = [startvals[prop] for prop in props]
 	
 	res = ode(efe)

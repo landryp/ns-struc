@@ -1,0 +1,124 @@
+#!/usr/bin/python
+__doc__ = 'PLOTUR -- plot universal relations with selected EoSs'
+__usage__ = 'plotur macro-EoS1.csv,macro-EoS2.csv,... [-v] [-x Lambda] [-y C] [-m 1.0,2.0] [-d ./dat/] [-o ./plt/]'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '03-2019'
+
+import numpy as np
+from optparse import OptionParser
+from nsstruc.pltsetup import *
+from nsstruc.constants import *
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-x', '--xvar', default='Lambda', help='which observable (Lambda, C or I) to plot on x-axis, DEFAULT=Lambda', metavar='Lambda')
+parser.add_option('-y', '--yvar', default='C', help='which observable (Lambda, C or I) to plot on y-axis, DEFAULT=C', metavar='C')
+parser.add_option('-m', '--mrng', default='1.0,2.0', help='comma-separated mass range for stellar sequences, DEFAULT=1.0,2.0', metavar='1.0,2.0')
+parser.add_option('-d', '--dir', default='./dat/', help='path to directory housing NS properties data, DEFAULT=./dat/', metavar='./dat/')
+parser.add_option('-o', '--outdir', default='./plt/', help='path to directory for plot output, DEFAULT=./plt/', metavar='./plt/')
+parser.add_option('-t', '--tag', default='', help='tag to append to output filename, DEFAULT=None', metavar='""')
+parser.add_option('-f', '--pltname', default='urplot', help='plot output filename (automatically appends .png), DEFAULT=urplot', metavar='urplot')
+parser.add_option('-v', '--verbose', action='store_true', default=False, help='toggle verbose output, DEFAULT=False', metavar='False')
+
+opts, args = parser.parse_args()
+eosnames = str(args[0]).split(',')
+xvar = str(opts.xvar)
+yvar = str(opts.yvar)
+mrng = str(opts.mrng).split(',')
+mrng = [float(m) for m in mrng]
+indir = str(opts.dir)
+outdir = str(opts.outdir)
+tag = str(opts.tag)
+pltname = str(opts.pltname)
+verb = opts.verbose
+
+# SPECIFY VARIABLES TO PLOT AND UNIVERSAL FIT
+
+obslabels = {'R': r'$R$','Lambda': r'$\Lambda$','I': r'$\bar{I}$','C': r'$C$'}
+obslog = {'R': 'linear','Lambda': 'log','I': 'log','C': 'linear'}
+obsdict = {'Lambda': 'Lambda','C': 'R','I': 'I','R': 'R'}
+
+def obs(var,dat):
+
+	obscalc = {'Lambda': dat,'C': G*Msun*Mdat/(c**2*dat*1e5),'I': c**4*dat*1e45/(G**2*(Mdat*Msun)**3),'R': dat}
+	
+	return obscalc[var]
+
+def fit(x,params):
+
+	sgn = params[-1]
+	xlog = params[-3]
+	ylog = params[-2]
+	
+	if xlog == False: x = np.exp(x)
+
+	logy = params[0] + params[1]*np.log(x)**sgn + params[2]*np.log(x)**(sgn*2) + params[3]*np.log(x)**(sgn*3) + params[4]*np.log(x)**(sgn*4)
+	
+	if ylog == False: return logy
+	else: return np.exp(logy)
+
+fitparams = {'ILambda': [1.496,0.05951,0.02238,-6.953e-4,8.345e-6,True,True,1.],'CLambda': [0.360,-0.0355,0.000705,0.,0.,True,False,1.],'IC': [0.,0.8134,0.2101,0.003175,-2.717e-4,False,False,-1.],'RLambda': [12.,0.,0.,0.,0.,False,False,1.]}
+# fits taken from Yagi+Yunes PhysRep 2016, Maselli+ PRD 2013, Breu+Rezzolla MNRAS 2016
+
+# SET UP FIGURE
+
+fig = plt.figure(1)
+fig.subplots_adjust(hspace=0., wspace=0.)
+
+subplt = plt.subplot(2,1,1)
+	
+subplt.set_ylabel(obslabels[yvar])
+subplt.set_xscale(obslog[xvar])
+subplt.set_yscale(obslog[yvar])
+subplt.set_xticks([],[])
+
+subplt2 = plt.subplot(2,1,2)
+	
+subplt2.set_xlabel(obslabels[xvar])
+subplt2.set_ylabel(r'$\Delta$'+obslabels[yvar])
+subplt2.set_xscale(obslog[xvar])
+
+# LOAD NS PROPERTIES FOR EACH EOS
+
+xmin = 1e10
+xmax = 0.
+for i in range(len(eosnames)):
+
+	eosname = eosnames[i]
+	shortname = (eosname.split('/')[-1]).split('.')[0]
+	if verb == True: print 'Plotting '+yvar+'-'+xvar+' relation for '+shortname
+
+	propspath = indir+eosname
+	propsdat = np.genfromtxt(propspath,names=True,delimiter=',')
+	
+	Mdat = propsdat['M']
+	datlen = len(Mdat)
+	Mdat = [M for M in Mdat if M >= mrng[0]]
+	posi = datlen - len(Mdat)
+	Mdat = np.asarray([M for M in Mdat if M <= mrng[1]])
+	posf = posi+len(Mdat)-1
+	
+	xdat = propsdat[obsdict[xvar]]
+	xdat = np.asarray([xdat[i] for i in range(posi,posf+1)])
+	xdat = obs(xvar,xdat)
+	
+	ydat = propsdat[obsdict[yvar]]
+	ydat = np.asarray([ydat[i] for i in range(posi,posf+1)])
+	ydat = obs(yvar,ydat)
+	
+	fitdat = fit(xdat,fitparams[yvar+xvar])
+	ydiff = np.abs(ydat - fitdat)/fitdat
+	
+	if np.min(xdat) < xmin: xmin = np.min(xdat)
+	if np.max(xdat) > xmax: xmax = np.max(xdat)
+
+# PLOT UNIVERSAL RELATION FOR EACH EOS
+
+	subplt.plot(xdat,ydat,lw=0,label=shortname,marker='.')
+	subplt2.plot(xdat,ydiff,lw=2,label=shortname,marker='.')
+
+if verb == True: print 'Done all EoSs\nPlotting best-fit relation'
+xtab = np.linspace(xmin,xmax,100)
+fitdat = fit(xtab,fitparams[yvar+xvar])
+subplt.plot(xtab,fitdat,lw=2,label='fit',ls='--')
+plt.legend(loc=0)
+plt.savefig(outdir+pltname+tag+'.png')
