@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# MAKEMACRO -- bash script to produce NS properties at Mmax, 1.4 Msun for whole directory of EoSs directly from EoS data
-# USAGE: makemacro ./eos/dir/ ./out/dir/ 50
+# MAKEMACRO -- calculate properties for specified stellar configuration with selected EoSs
+# USAGE: makemacro ./eos/dir/ ./out/dir/ M=1.4 50
 
-indir=$1
-outdir=$2
-num=$3
+indir=$1 # EoS table or directory thereof
+outdir=$2 # output directory
+target=$3 # stellar configuration to return
+num=$4 # number of central densities to sample per EoS
 
 i=0
 for file in ${indir}*.csv
@@ -13,7 +14,7 @@ do
 	getnsprops $(basename "$file") -d $indir -o $outdir -t macro- -n $num
 	splitbranches "macro-$(basename "$file")" -d $outdir -o $outdir -t branch-
 	
-	for subfile in ${outdir}$(basename "$file")/*.csv
+	for subfile in ${outdir}$(basename "$file" .csv)/*.csv
 	do
 		branches[i]=$subfile
 		i=$(($i+1))
@@ -22,5 +23,4 @@ done
 
 branchlist=$(echo ${branches[*]} | sed "s/ /,/g")
 
-getmacro $branchlist -d "" -o ${outdir}/../ -p M=1.4 -f canon
-getmacro $branchlist -d "" -o ${outdir}/../ -p M=max -f max
+getmacro $branchlist -d "" -o $outdir -p $target -f star -b
