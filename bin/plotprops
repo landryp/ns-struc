@@ -60,7 +60,7 @@ for eosname in eosnames:
 		subplt.set_xlim(lims[0],lims[1])
 		subplt.set_ylabel(propslabels[prop])
 		if prop == 'Lambda':
-			subplt.set_yscale('log')
+			if any(L > 0. for L in propsdat[prop]): subplt.set_yscale('log')
 			subplt.minorticks_off()
 		subplt.set_xticks([],[])
 		
