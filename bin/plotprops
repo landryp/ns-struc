@@ -16,6 +16,8 @@ parser.add_option('-d', '--dir', default='./dat/', help='path to directory housi
 parser.add_option('-o', '--outdir', default='./plt/', help='path to directory for plot output, DEFAULT=./plt/', metavar='./plt/')
 parser.add_option('-t', '--tag', default='', help='tag to append to output filename, DEFAULT=None', metavar='""')
 parser.add_option('-f', '--pltname', default='propsplot', help='plot output filename (automatically appends .png), DEFAULT=propsplot', metavar='propsplot')
+parser.add_option('-a', '--alpha', default=1., help='transparency of curves on plot, DEFAULT=1.0', metavar='1.0')
+parser.add_option('-L', '--legend', action='store_false', default=True, help='toggle legend display, DEFAULT=True', metavar='True')
 parser.add_option('-v', '--verbose', action='store_true', default=False, help='toggle verbose output, DEFAULT=False', metavar='False')
 
 opts, args = parser.parse_args()
@@ -29,6 +31,8 @@ indir = str(opts.dir)
 outdir = str(opts.outdir)
 tag = str(opts.tag)
 pltname = str(opts.pltname)
+a = float(opts.alpha)
+leg = opts.legend
 verb = opts.verbose
 
 fig = plt.figure(1)
@@ -64,11 +68,11 @@ for eosname in eosnames:
 			subplt.minorticks_off()
 		subplt.set_xticks([],[])
 		
-		subplt.plot(propsdat['M'],propsdat[prop],lw=2,label=shortname,marker='.')
+		subplt.plot(propsdat['M'],propsdat[prop],lw=2,label=shortname,marker='.', alpha=a)
 		
 		if not sharex: 
 			subplt.xaxis.set_major_locator(AutoLocator())
-			plt.legend(loc=0)		
+			if leg == True: plt.legend(loc=0)		
 			plt.savefig(outdir+pltname+tag+'-'+prop+'.png')
 			
 		if verb == True: print 'Done '+str(prop)+'-M relation'
@@ -77,6 +81,6 @@ for eosname in eosnames:
 
 if sharex:
 	subplt.xaxis.set_major_locator(AutoLocator())
-	plt.legend(loc=0)		
+	if leg == True: plt.legend(loc=0)		
 	plt.savefig(outdir+pltname+tag+'.png')
 
