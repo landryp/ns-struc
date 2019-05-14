@@ -50,20 +50,18 @@ def tov(eospath,rhoc,props=['R','M','Lambda'],stp=1e1,pts=2e3,maxr=2e6,tol=1e1):
 	res.set_initial_value(y0,stp)
 	dt = (maxr-stp)/pts # fixed radial step size for data returned by integration
 	
-	sols = np.zeros((len(props)+1,pts)) # container for solutions
+#	sols = np.zeros((len(props)+1,pts)) # container for solutions
 	i=-1
 	while res.successful() and res.y[props.index('R')] >= tol and i < pts-1: # stop integration when pressure vanishes (to within tolerance tol)
 
 		i = i+1
 		res.integrate(res.t+dt)
-		sols[0,i] = res.t	# r values
+#		sols[0,i] = res.t	# r values		# UNCOMMENT TO STORE FULL SOLS
+#		sols[1:,i] = res.y	# p, m + other values
 		
-		for j in range(len(props)):
-		
-			sols[j+1,i] = res.y[j]	# p, m + other values
-		
-	vals = [sols[j,i] for j in range(len(props)+1)] # surface values of R, p, M, etc.
-
+#	vals = [sols[j,i] for j in range(len(props)+1)] # surface values of R, p, M, etc.
+	vals = [res.t] + list(res.y)
+	
 # CALCULATE NS PROPERTIES AT SURFACE
 	
 	obs = calcobs(vals,props)
