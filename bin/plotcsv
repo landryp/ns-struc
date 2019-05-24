@@ -1,0 +1,96 @@
+#!/usr/bin/python
+__doc__ = 'PLOTCSV -- plot csv files file1.csv, file2.csv, ... '
+__usage__ = 'ploteos file1.csv,file2.csv,... [-x COLUMN_NAME] [-y COLUMN_NAME1,COLUMN_NAME2] [-l XMIN,XMAX,YMIN,YMAX] '
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '05-2019'
+
+import numpy as np
+from optparse import OptionParser
+from nsstruc.pltsetup import *
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-x', '--xcol', default=False, help='which column to plot on x-axis, DEFAULT=FIRST_COLUMN', metavar='COLUMN_NAME')
+parser.add_option('-y', '--ycols', default=False, help='which columns to plot on y-axis, DEFAULT=OTHER_COLUMNS', metavar='COLUMN_NAME1,COLUMN_NAME2,...')
+parser.add_option('-l', '--lims', default=False, help='x and y ranges for plot, DEFAULT=AUTO', metavar='XMIN,XMAX,YMIN,YMAX')
+parser.add_option('-A', '--axislabels', default=False, help='x and y axis labels, DEFAULT=XCOLUMN_NAME,YCOLUMN_NAME1', metavar='XLABEL,YLABEL')
+parser.add_option('-L', '--logaxis', default=[False,False], help='whether x and y axes should be log-scaled, DEFAULT=[False,False]', metavar='[XBOOL,YBOOL]')
+parser.add_option('-k', '--key', action='store_false', default=True, help='toggle legend/key display, DEFAULT=True', metavar='BOOL')
+parser.add_option('-a', '--alpha', default=1., help='transparency of plotted curves, DEFAULT=1.', metavar='ALPHA')
+parser.add_option('-m', '--markers', action='store_false', default=True, help='toggle markers on curves, DEFAULT=True', metavar='BOOL')
+parser.add_option('-j', '--joined', action='store_false', default=True, help='toggle joined curves, DEFAULT=True', metavar='BOOL')
+parser.add_option('-d', '--dir', default='./', help='input directory path, DEFAULT="./"', metavar='PATH/TO/DIR/')
+parser.add_option('-o', '--outdir', default='./', help='output directory path, DEFAULT="./"', metavar='PATH/TO/DIR')
+parser.add_option('-f', '--outfile', default='plot', help='plot basename for save, DEFAULT="plot"', metavar='PLOTNAME')
+parser.add_option('-t', '--tag', default='', help='tag to append to plot basename, DEFAULT=NONE', metavar='-TAG')
+
+opts, args = parser.parse_args()
+filenames = str(args[0]).split(',')
+xvar = opts.xcol
+if xvar: xvar=str(xvar)
+yvar = opts.ycols
+if yvar: yvar=str(yvar).split(',')
+lims = opts.lims
+if lims: lims = str(opts.lims).split(',')
+labels = opts.axislabels
+if labels: labels = str(opts.labels).split(',')
+logaxis = opts.logaxis
+key = opts.key
+alph = float(opts.alpha)
+markers = opts.markers
+if not markers: mrk = None
+joined = opts.joined
+if not joined: lwidth = 0
+else: lwidth = 1.5
+indir = str(opts.dir)
+outdir = str(opts.outdir)
+pltname = str(opts.outfile)
+tag = str(opts.tag)
+
+# SET UP FIGURE
+
+plt.figure(1)
+if lims:
+	plt.xlim(lims[0],lims[1])
+	plt.ylim(lims[2],lims[3])
+if logaxis[0]: plt.xscale('log')
+if logaxis[1]: plt.yscale('log')
+
+
+# READ CSV DATA FROM EACH FILE
+j = 0
+for fname in filenames:
+
+	shortname = (fname.split('/')[-1]).split('.')[0]
+	fpath = indir+fname
+	fdat = np.genfromtxt(fpath,names=True,delimiter=',')
+	if not xvar: xvar = fdat.dtype.names[0]
+	if not yvar: yvar = fdat.dtype.names[1:]
+	if not labels: labels = [xvar,yvar[0]]
+	plt.xlabel(labels[0])
+	plt.ylabel(labels[1])
+	
+	if alph != 1.: lc = AUTO_COLORS[j]
+	else: lc = AUTO_COLORS[0]
+	
+# PLOT DATA
+
+	i = 0
+	for var in yvar:
+
+		if markers: mrk = '.' #AUTO_MARKERS[i%len(AUTO_MARKERS)]
+		style = AUTO_LINESTYLES[i%len(AUTO_LINESTYLES)]
+		if i==0: lb = shortname
+		else: lb = None
+		
+		plt.plot(fdat[xvar],fdat[var],label=lb,color=lc,lw=lwidth,ls=style,marker=mrk,alpha=alph)
+		
+		i = i+1
+	
+	j = j+1
+
+if len(yvar) > 1:
+	caption = [' '+yvar[k]+' ('+AUTO_LINESTYLES[k%len(AUTO_LINESTYLES)]+')' for k in range(len(yvar))]
+	plt.title(','.join(caption))
+if key: plt.legend(loc=0)
+plt.savefig(outdir+pltname+tag+'.png')
+
