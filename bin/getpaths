@@ -1,0 +1,47 @@
+#!/usr/bin/python
+__doc__ = 'GETPATHS -- return comma-separated list of specified paths'
+__usage__ = 'GETPATHS basename reffile'
+__author__ = 'philippe.landry@ligo.org'
+__date__ = '05-2019'
+
+import numpy as np
+from optparse import OptionParser
+import os
+import glob
+
+parser = OptionParser(usage=__usage__, description=__doc__)
+parser.add_option('-d', '--dir', default='./', help='input directory path, DEFAULT="./"', metavar='PATH/TO/DIR/')
+parser.add_option('-o', '--outdir', default='./', help='output directory path, DEFAULT="./"', metavar='PATH/TO/DIR')
+parser.add_option('-s', '--subdirnames', default='DRAWmod1,MACROdraw', help='subdirectory basenames, DEFAULT="DRAWmod1,MACROdraw"', metavar='SUBDIR_NAME1,SUBDIR_NAME2,...')
+parser.add_option('-m', '--mod', default='1,1', help='moduli for subdirectory numbering, DEFAULT="1,1"', metavar='MOD_SUBDIR1,MOD_SUBDIR2,...')
+parser.add_option('-t', '--tag', default='', help='tag for basenames, DEFAULT=NONE', metavar='-TAG')
+
+opts, args = parser.parse_args()
+basename = str(args[0])
+reffile = str(args[1])
+indir = str(opts.dir)
+outdir = str(opts.outdir)
+subdirs = str(opts.subdirnames).split(',')
+mods = str(opts.mod).split(',')
+mods = [int(mod) for mod in mods]
+tag = str(opts.tag)
+
+refpath = indir+reffile
+refdat = np.genfromtxt(refpath,names=True,delimiter=',',dtype=int)
+eosnums = refdat['EoS']
+
+paths = []
+for eosnum in eosnums:
+
+	i = 0
+	subpaths = []
+	for sub in subdirs:
+	
+		subpaths.append(sub+'-'+str(eosnum/mods[i]).zfill(6))
+		i = i+1
+
+	subpath = '/'.join(subpaths)
+	paths.append(outdir+subpath+'/'+basename+'-'+str(eosnum).zfill(6)+tag+'.csv')
+	
+print ','.join(paths)
+

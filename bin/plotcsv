@@ -13,7 +13,7 @@ parser.add_option('-x', '--xcol', default=False, help='which column to plot on x
 parser.add_option('-y', '--ycols', default=False, help='which columns to plot on y-axis, DEFAULT=OTHER_COLUMNS', metavar='COLUMN_NAME1,COLUMN_NAME2,...')
 parser.add_option('-l', '--lims', default=False, help='x and y ranges for plot, DEFAULT=AUTO', metavar='XMIN,XMAX,YMIN,YMAX')
 parser.add_option('-A', '--axislabels', default=False, help='x and y axis labels, DEFAULT=XCOLUMN_NAME,YCOLUMN_NAME1', metavar='XLABEL,YLABEL')
-parser.add_option('-L', '--logaxis', default=[False,False], help='whether x and y axes should be log-scaled, DEFAULT=[False,False]', metavar='[XBOOL,YBOOL]')
+parser.add_option('-L', '--logaxis', default='False,False', help='whether x and y axes should be log-scaled, DEFAULT=False,False', metavar='XBOOL,YBOOL')
 parser.add_option('-k', '--key', action='store_false', default=True, help='toggle legend/key display, DEFAULT=True', metavar='BOOL')
 parser.add_option('-a', '--alpha', default=1., help='transparency of plotted curves, DEFAULT=1.', metavar='ALPHA')
 parser.add_option('-m', '--markers', action='store_false', default=True, help='toggle markers on curves, DEFAULT=True', metavar='BOOL')
@@ -30,10 +30,13 @@ if xvar: xvar=str(xvar)
 yvar = opts.ycols
 if yvar: yvar=str(yvar).split(',')
 lims = opts.lims
-if lims: lims = str(opts.lims).split(',')
+if lims:
+	lims = str(opts.lims).split(',')
+	lims = [float(lim) for lim in lims]
 labels = opts.axislabels
-if labels: labels = str(opts.labels).split(',')
-logaxis = opts.logaxis
+if labels: labels = str(labels).split(',')
+logaxis = str(opts.logaxis).split(',')
+logaxis = [not logax == 'False' for logax in logaxis]
 key = opts.key
 alph = float(opts.alpha)
 markers = opts.markers
@@ -55,7 +58,6 @@ if lims:
 if logaxis[0]: plt.xscale('log')
 if logaxis[1]: plt.yscale('log')
 
-
 # READ CSV DATA FROM EACH FILE
 j = 0
 for fname in filenames:
@@ -69,8 +71,10 @@ for fname in filenames:
 	plt.xlabel(labels[0])
 	plt.ylabel(labels[1])
 	
-	if alph != 1.: lc = AUTO_COLORS[j]
-	else: lc = AUTO_COLORS[0]
+	if alph != 1.: lc = AUTO_COLORS[0]
+	else: lc = AUTO_COLORS[j]
+	
+	print lc
 	
 # PLOT DATA
 
