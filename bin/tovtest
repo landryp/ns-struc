@@ -13,5 +13,8 @@ parser = OptionParser()
 opts, args = parser.parse_args()
 eospath = str(args[0])
 rhoc = float(args[1])
+params = str(args[3])
 
-print tov(eospath,rhoc,['R','M','Lambda'])
+param = params.split(',')
+
+print tov(eospath,rhoc,param)
