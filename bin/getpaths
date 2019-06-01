@@ -32,6 +32,7 @@ refpath = indir+reffile
 refdat = np.genfromtxt(refpath,names=True,delimiter=',',dtype=int)
 eosnums = refdat['EoS']
 
+eosnums = list(set(eosnums))
 if len(eosnums) > num: eosnums = eosnums[0:num]
 
 paths = []
