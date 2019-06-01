@@ -14,6 +14,7 @@ parser.add_option('-d', '--dir', default='./', help='input directory path, DEFAU
 parser.add_option('-o', '--outdir', default='./', help='output directory path, DEFAULT="./"', metavar='PATH/TO/DIR')
 parser.add_option('-s', '--subdirnames', default='DRAWmod1,MACROdraw', help='subdirectory basenames, DEFAULT="DRAWmod1,MACROdraw"', metavar='SUBDIR_NAME1,SUBDIR_NAME2,...')
 parser.add_option('-m', '--mod', default='1,1', help='moduli for subdirectory numbering, DEFAULT="1,1"', metavar='MOD_SUBDIR1,MOD_SUBDIR2,...')
+parser.add_option('-n', '--num', default=1e5, help='number of files at which to truncate, DEFAULT=1e5', metavar='NUM_FILES')
 parser.add_option('-t', '--tag', default='', help='tag for basenames, DEFAULT=NONE', metavar='-TAG')
 
 opts, args = parser.parse_args()
@@ -24,11 +25,14 @@ outdir = str(opts.outdir)
 subdirs = str(opts.subdirnames).split(',')
 mods = str(opts.mod).split(',')
 mods = [int(mod) for mod in mods]
+num = int(num)
 tag = str(opts.tag)
 
 refpath = indir+reffile
 refdat = np.genfromtxt(refpath,names=True,delimiter=',',dtype=int)
 eosnums = refdat['EoS']
+
+if len(eosnums) > num: eosnums = eosnums[0:num]
 
 paths = []
 for eosnum in eosnums:
