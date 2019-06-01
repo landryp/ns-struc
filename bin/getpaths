@@ -25,7 +25,7 @@ outdir = str(opts.outdir)
 subdirs = str(opts.subdirnames).split(',')
 mods = str(opts.mod).split(',')
 mods = [int(mod) for mod in mods]
-num = int(num)
+num = int(opts.num)
 tag = str(opts.tag)
 
 refpath = indir+reffile
