@@ -23,6 +23,7 @@ parser.add_option('-d', '--dir', default='./', help='input directory path, DEFAU
 parser.add_option('-o', '--outdir', default='./', help='output directory path, DEFAULT="./"', metavar='PATH/TO/DIR')
 parser.add_option('-f', '--outfile', default='plot', help='plot basename for save, DEFAULT="plot"', metavar='PLOTNAME')
 parser.add_option('-t', '--tag', default='', help='tag to append to plot basename, DEFAULT=NONE', metavar='-TAG')
+parser.add_option('-c', '--cutoff', default=False, help='cutoff data at line number, DEFAULT=NONE', metavar='LINE_NUM')
 
 opts, args = parser.parse_args()
 filenames = str(args[0]).split(',')
@@ -51,6 +52,8 @@ indir = str(opts.dir)
 outdir = str(opts.outdir)
 pltname = str(opts.outfile)
 tag = str(opts.tag)
+cutoff = opts.cutoff
+if cutoff:	lastline=int(cutoff)-1
 
 # SET UP FIGURE
 
@@ -87,7 +90,14 @@ for fname in filenames:
 		if i==0: lb = shortname
 		else: lb = None
 		
-		plt.plot(fdat[xvar],fdat[var],label=lb,color=lc,lw=lwidth,ls=style,marker=mrk,alpha=alph)
+	
+		if cutoff:
+		
+			plt.plot(fdat[xvar][:lastline],fdat[var][:lastline],label=lb,color=lc,lw=lwidth,ls=style,marker=mrk,alpha=alph)
+		
+		else:
+				
+			plt.plot(fdat[xvar],fdat[var],label=lb,color=lc,lw=lwidth,ls=style,marker=mrk,alpha=alph)
 		
 		i = i+1
 	
@@ -107,7 +117,13 @@ if refs:
 			if i==0: lb = shortname
 			else: lb = None
 		
-			plt.plot(refdat[xvar],refdat[var],label=lb,color='r',lw=lwidth,ls=style)
+			if cutoff:
+				
+				plt.plot(refdat[xvar][:lastline],refdat[var][:lastline],label=lb,color='r',lw=lwidth,ls=style)
+				
+			else:
+			
+				plt.plot(refdat[xvar],refdat[var],label=lb,color='r',lw=lwidth,ls=style)
 			
 			i = i+1
 

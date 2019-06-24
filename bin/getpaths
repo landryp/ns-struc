@@ -46,6 +46,7 @@ for eosnum in eosnums:
 		i = i+1
 
 	subpath = '/'.join(subpaths)
+	if subdirs[0] == 'None':	subpath = ''
 	paths.append(outdir+subpath+'/'+basename+'-'+str(eosnum).zfill(6)+tag+'.csv')
 	
 print ','.join(paths)
