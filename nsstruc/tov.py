@@ -20,59 +20,75 @@ DEFAULT_MAX_R = 2e6 ### cm
 DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
 
 DEFAULT_PROPS = ['R', 'M', 'Lambda']
-KNOWN_PROPS = ['R', 'M', 'Lambda', 'I', 'Mb']
 
 #-------------------------------------------------
 
 # DEFINE TOV AND PERTURBATION EQUATIONS
 
-def hydro(r, y, eps, cs2i, rho, props): # hydrostatic equilibrium
-    p = y[props.index('R')] # p in units of g/cm^3
-    m = y[props.index('M')] # m in units of cm*c^2/G
-    return -G*(eps(p)+p)*(m+4.*np.pi*r**3*p)/(c**2*r**2*(1.-2.*G*m/(c**2*r)))
+def hydro(r, p, m, eps): # hydrostatic equilibrium
+    return -G_c2 * (eps + p) * (m + fourpi*p*r**3) / (r**2 * (1. - 2.*G_c2*m/r))
                
-def mass(r, y, eps, cs2i, Rho, props): # definition of the mass
-    p = y[props.index('R')] # p in units of g/cm^3
-    return 4.*np.pi*r**2*eps(p)
+def mass(r, eps): # definition of the mass
+    return fourpi * eps * r**2
        
-def baryonmass(r, y, eps, cs2i, rho, props): # definition of the baryonic mass
-    p = y[props.index('R')] # p in units of g/cm^3
-    m = y[props.index('M')] # m in units of cm*c^2/G
-
-    f = 1.-2.*G*m/(c**2*r)
-    return 4.*np.pi*r**2*rho(p)/f**0.5 
+def baryonmass(r, m, rho): # definition of the baryonic mass
+    f = 1. - 2.*G_c2*m/r
+    return fourpi * rho * r**2 / f**0.5 
        
-def equad(r, y, eps, cs2i, rho, props): # gravitoelectric quadrupole tidal perturbation
-    p = y[props.index('R')] # p in units of g/cm^3
-    m = y[props.index('M')] # m in units of cm*c^2/G
-    eta = y[props.index('Lambda')] # dimensionless logarithmic derivative of metric perturbation
+def equad(r, p, m, eta, eps, cs2i): # gravitoelectric quadrupole tidal perturbation
+    f = 1. - 2.*G_c2*m/r
+    A = (2./f) * (1. - 3.*G_c2*m/r - 2.*G_c2*pi*r**2 * (eps + 3.*p))
+    B = (1./f) * (6. - 4.*G_c2*pi*r**2 * (eps + p) * (3. + cs2i))
+    return (-1./r) * (eta*(eta - 1.) + A*eta - B) # from Landry+Poisson PRD 89 (2014)
 
-    f = 1.-2.*G*m/(c**2*r)
-    A = (2./f)*(1.-3.*G*m/(c**2*r)-2.*G*np.pi*r**2*(eps(p)+3.*p)/c**2)
-    B = (1./f)*(6.-4.*G*np.pi*r**2*(eps(p)+p)*(3.+cs2i(p))/c**2)
-
-    return (-1./r)*(eta*(eta-1.)+A*eta-B) # from Landry+Poisson PRD 89 (2014)
-
-def slowrot(r, y, eps, cs2i, rho, props): # slow rotation equation
-    p = y[props.index('R')] # p in units of g/cm^3
-    m = y[props.index('M')] # m in units of cm*c^2/G
-    omega = y[props.index('I')] # log derivative of frame-dragging function
-
-    f = 1.-2.*G*m/(c**2*r)
-    P = 4.*np.pi*G*r**2*(eps(p)+p)/(c**2*f)
-
-    return -(1./r)*(omega*(omega+3.)-P*(omega+4.))
+def slowrot(r, p, m, omega, eps): # slow rotation equation
+    f = 1. - 2.*G_c2*m/r
+    P = fourpi *G_c2*r**2*(eps + p) / f
+    return -(1./r) * (omega*(omega + 3.) - P*(omega + 4.))
 
 EQSDICT = {
     'R': hydro,
     'M': mass,
     'Lambda': equad,
     'I': slowrot,
-     'Mb': baryonmass,
+    'Mb': baryonmass,
 }
+KNOWN_PROPS = list(EQSDICT.keys())
 def define_efe(eps, cs2i, rho, props):
+    """we jump through all these hoops to avoid having to repeatedly call props.index within the actual integration routine"""
+
+    args = []
+    p_ind = props.index('R') ### we can rely on this being present because we need it for termination condition...
+    for prop in props:
+        if prop == 'R':
+            inds = [p_ind, props.index('M')]
+            interps = (eps,)
+
+        elif prop == 'M':
+            inds = []
+            interps = (eps,)
+
+        elif prop == 'Mb':
+            inds = [props.index('M')]
+            interps = (rho,)
+
+        elif prop == 'Lambda':
+            inds = [p_ind, props.index('M'), props.index('Lambda')]
+            interps = (eps, cs2i)
+
+        elif prop == 'I':
+            inds = [p_ind, props.index('M'), props.index('I')]
+            interps = (eps,)
+
+        else:
+            raise ValueError('prop=%s not understood!'%prop)
+
+        args.append((EQSDICT[prop], inds, interps))
+
     def efe(r, y):
-        return [EQSDICT[prop](r, y, eps, cs2i, rho, props) for prop in props]
+        p = y[p_ind]
+        return [foo(r, *list(y[inds])+[_(p) for _ in interps]) for foo, inds, interps in args]
+
     return efe
 
 #-------------------------------------------------
@@ -135,7 +151,7 @@ VALS2MACROS = {
 
 # INTEGRATE TOV AND FRIENDS
 
-def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL):
+def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL, verbose=True):
 
     ### set up integrator
     res = ode(efe)
@@ -147,13 +163,26 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX
     i = 0
     p_ind = props.index('R')
 #    p0 = y0[p_ind]
-    while res.successful() and (res.y[p_ind] >= pressurec2_tol) and (i < num_r): # stop integration when pressure vanishes (to within tolerance tol)
-#        guess_dr = 1.5 * res.t/(p0/res.y[p_ind] - 1) ### P * dR/dP ~ R / (P0/P - 1)
-                                                      ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
-#        res.integrate(res.t + min(max_dr, max(r0, guess_dr)))
+    while res.successful():
+        if (res.y[p_ind] < pressurec2_tol): ### main termination condition
+            break
 
-       	res.integrate(res.t + max_dr)
-       	i += 1
+        elif i < num_r: # stop integration when pressure vanishes (to within tolerance tol)
+#            guess_dr = 1.5 * res.t/(p0/res.y[p_ind] - 1) ### P * dR/dP ~ R / (P0/P - 1)
+                                                          ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
+#            res.integrate(res.t + min(max_dr, max(r0, guess_dr)))
+
+            res.integrate(res.t + max_dr)
+            i += 1
+
+        else:
+            if verbose:
+                print('WARNING: integration did not find surface after %d iterations'%num_r)
+            break
+
+    else:
+        if verbose:
+            print('WARNING: integration was not successful!')
 
     # CALCULATE NS PROPERTIES AT SURFACE
     return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
