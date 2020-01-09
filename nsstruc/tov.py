@@ -167,7 +167,7 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
             break
 
         elif i < num_r: # stop integration when pressure vanishes (to within tolerance tol)
-            if res.t != r_old:
+            if y_old[p_ind] != res.y[p_ind]:
                 guess_dr = 1.5 * (res.t - r_old) / (y_old[p_ind]/res.y[p_ind] - 1) ### P * dR/dP ~ P * (R - R0) / (P - P0) ~ (R - R0) / (P0/P - 1)
                                                                   ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
                 dr = min(max_dr, max(r0, guess_dr))
