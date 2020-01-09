@@ -65,6 +65,8 @@ args = parser.parse_args()
 
 for prop in args.props:
     assert prop in tov.KNOWN_PROPS, 'prop=%s not understood!'%prop
+if 'R' not in args.props: ### we must have this present because integration termination condition is based on finding R!
+    args.props.append('R')
 header = 'rhoc,'+','.join(args.props)
 
 min_rhoc, max_rhoc = np.array(args.rhoc_range)*rhonuc
@@ -92,7 +94,7 @@ for eospath in args.eos:
     cs2i = interp1d(pressurec2, np.gradient(energy_densityc2, pressurec2), kind='linear', bounds_error=False, fill_value=0)
 
     ### define integration function, which will be re-used within iteration over rhoc
-#    efe = tov.define_equations(args.props, mu, P, cs2i, Rho)
+    efe = tov.define_efe(mu, P, cs2i, Rho, args.props)
 
     ### define grid for integration
     properties[:,0] = np.linspace(max(min_rhoc, baryon_density[0]), min(max_rhoc, baryon_density[-1]), args.num_rhoc)
@@ -101,31 +103,16 @@ for eospath in args.eos:
         print('Start at central density %.6e g/cm^3'%(properties[0,0]))
 
     for i, rhoc in enumerate(properties[:,0]): # compute macroscopic properties for star of each central density
+        pc = P(rhoc)
         properties[i,1:] = tov.tov(
-            mu,
-            P,
-            cs2i,
-            Rho,
-            rhoc,
+            efe,                                                                   ### equations
+            tov.initconds(pc, mu(pc), cs2i(pc), rhoc, args.initial_R, args.props), ### initial conditions
+            args.initial_R,                                                        ### initial radius
             props=args.props,
-            initial_r=args.initial_R,
             num_r=args.num_R,
             max_r=args.max_R,
             pressurec2_tol=args.pressurec2_tol,
         )
-#        properties[i,1:] = tov.tov(
-#            mu,
-#            P,
-#            cs2i,
-#            Rho,
-#            rhoc,
-#            efe=efe,
-#            props=args.props,
-#            initial_r=args.initial_R,
-#            num_r=args.num_R,
-#            max_r=args.max_R,
-#            pressurec2_tol=args.pressurec2_tol,
-#        )
 
     macropath = eospath2macropath(eospath)
     if args.verbose:

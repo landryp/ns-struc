@@ -87,9 +87,13 @@ def slowrot(r,y,*args): # slow rotation equation
                
        return -(1./r)*(omega*(omega+3.)-P*(omega+4.))  
 
-def eqsdict(): # dictionary linking NS properties with corresponding equation of stellar structure
-
-       return {'R': hydro,'M': mass,'Lambda': equad,'I': slowrot,'Mb': baryonmass}
+EQSDICT = {
+    'R': hydro,
+    'M': mass,
+    'Lambda': equad,
+    'I': slowrot,
+     'Mb': baryonmass,
+}
 
 #-------------------------------------------------
 
@@ -104,11 +108,10 @@ def initconds(pc, muc, cs2ic, rhoc, initial_r, props):
     omegac = 16.*pi * G_c2 * initial_r**2 * (pc + muc) / 5.
     mbc = fourpi * initial_r**3 * rhoc / 3.
 
-    return {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
+    startvals = {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
+    return [startvals[prop] for prop in props]
 
 #-------------------------------------------------
-
-# SURFACE VALUES
 
 # SURFACE VALUES to mactroscip observables
 
@@ -152,31 +155,25 @@ VALS2MACROS = {
 
 # INTERPOLATE CONTINUOUS FLUID VARIABLES FROM DISCRETE EOS DATA
 
-def tov(mu, P, cs2i, Rho, rhoc, props=DEFAULT_PROPS, initial_r=DEFAULT_INITIAL_R, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL):
-    stp = initial_r
-    pts = num_r
-    maxr = max_r
-    tol = pressurec2_tol
+def define_efe(mu, P, cs2i, Rho, props):
+    def efe(r, y):
+        return [EQSDICT[prop](r,y,mu,cs2i,Rho,props) for prop in props]
+    return efe
 
-    eqs = eqsdict() # associate NS properties with corresponding equation of stellar structure
+def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL):
 
-    # PERFORM INTEGRATION OF EQUATIONS OF STELLAR STRUCTURE
-    def efe(r,y): return [eqs[prop](r,y,mu,cs2i,Rho,props) for prop in props]
-
-    pc = float(P(rhoc)) # central pressure from interpolated p(rho) function
-    muc = mu(pc) # central energy density from interpolated mu(p) function
-    cs2ic = cs2i(pc) # central sound speed from interpolated cs2i(p) function
-    startvals = initconds(pc,muc,cs2ic,rhoc,stp,props) # load BCs at center of star for integration
-    y0 = [startvals[prop] for prop in props]
-
+    ### set up integrator
     res = ode(efe)
-    res.set_initial_value(y0,stp)
-    dt = (maxr-stp)/pts # fixed radial step size for data returned by integration
+    res.set_initial_value(y0, r0)
 
-    i=-1
-    while res.successful() and res.y[props.index('R')] >= tol and i < pts-1: # stop integration when pressure vanishes (to within tolerance tol)
-       	i = i+1
-       	res.integrate(res.t+dt)
+    ### step size in radius
+    dr = (max_r - r0) / num_r # fixed radial step size for data returned by integration
+
+    i = 0
+    p_ind = props.index('R')
+    while res.successful() and (res.y[p_ind] >= pressurec2_tol) and (i < num_r): # stop integration when pressure vanishes (to within tolerance tol)
+       	res.integrate(res.t+dr)
+       	i += 1
 
     # CALCULATE NS PROPERTIES AT SURFACE
     return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
