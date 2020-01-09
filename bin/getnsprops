@@ -24,11 +24,6 @@ DEFAULT_MIN_RHOC = 0.8
 DEFAULT_MAX_RHOC = 12.0
 DEFAULT_RHOC_RANGE = [DEFAULT_MIN_RHOC, DEFAULT_MAX_RHOC]
 
-DEFAULT_R_STEP = 10 ### cm
-DEFAULT_NUM_R = 2000
-DEFAULT_MAX_R = 2e6 ### cm
-DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
-
 #-------------------------------------------------
 
 OUTPATH_TEMPLATE = '%s/macro-%s'
@@ -54,8 +49,6 @@ parser.add_argument('-s', '--initial-R', type=float, default=tov.DEFAULT_INITIAL
     help='starting point for radial TOV integration in cm. Should be small.')
 parser.add_argument('-N', '--num-R', type=int, default=tov.DEFAULT_NUM_R,
     help='number of points for radial TOV integration')
-parser.add_argument('-m', '--max-R', type=float, default=tov.DEFAULT_MAX_R,
-    help='radius endpoint in cm for surface finding algorithm')
 parser.add_argument('--max-dR', type=float, default=tov.DEFAULT_MAX_DR,
     help='radius endpoint in cm for surface finding algorithm')
 parser.add_argument('-T', '--pressurec2-tol', type=float, default=tov.DEFAULT_PRESSUREC2_TOL,

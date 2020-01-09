@@ -16,7 +16,6 @@ from .constants import *
 
 DEFAULT_INITIAL_R = 10 ### cm
 DEFAULT_NUM_R = 2000
-DEFAULT_MAX_R = 2e6 ### cm
 DEFAULT_MAX_DR = 1e5 ### cm
 DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
 
@@ -161,7 +160,7 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
     ### initialize the integration loop
     i = 0
     p_ind = props.index('R') ### we can rely on this being present because it has to be for termination condition to make sense
-    p_old = y0[p_ind]
+    y_old = res.y[:]
     r_old = 0.
     while res.successful():
         if (res.y[p_ind] < pressurec2_tol): ### main termination condition
@@ -169,14 +168,14 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
 
         elif i < num_r: # stop integration when pressure vanishes (to within tolerance tol)
             if res.t != r_old:
-                guess_dr = 1.5 * (res.t - r_old) / (p_old/res.y[p_ind] - 1) ### P * dR/dP ~ P * (R - R0) / (P - P0) ~ (R - R0) / (P0/P - 1)
+                guess_dr = 1.5 * (res.t - r_old) / (y_old[p_ind]/res.y[p_ind] - 1) ### P * dR/dP ~ P * (R - R0) / (P - P0) ~ (R - R0) / (P0/P - 1)
                                                                   ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
                 dr = min(max_dr, max(r0, guess_dr))
 
             else:
                 dr = max_dr
 
-            p_old = res.y[p_ind] ### update these for better estimates of slope moving forward
+            y_old = res.y[:] ### update these for better estimates of slope moving forward
             r_old = res.t
 
             res.integrate(res.t + dr) ### actually integrate
@@ -195,5 +194,10 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
         print('integration took %d steps'%i)
 
     # CALCULATE NS PROPERTIES AT SURFACE
-    ### FIXME: either interpolate or extrapolate to values when P=0 exactly?
-    return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
+
+    # extrapolate to find the surface
+    frac = res.y[p_ind] / (res.y[p_ind] - y_old[p_ind])
+    R = (res.t-r_old)*frac + res.t
+    y = (res.y-y_old)*frac + res.y
+
+    return [VALS2MACROS[prop](R, y, props) for prop in props]
