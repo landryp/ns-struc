@@ -1,11 +1,28 @@
-#!/usr/bin/python
+"a module that hoses logic for TOV integration"
+__author__ = 'philippe.landry@ligo.org and Reed Essick (reed.essick@gmail.com)'
+
+#-------------------------------------------------
 
 import numpy as np
+
 from scipy.interpolate import interp1d
 from scipy.integrate import ode
+
+### non-standard libraries
 from .struceqs import *
 from .constants import *
 
+#-------------------------------------------------
+
+DEFAULT_INITIAL_R = 10 ### cm
+DEFAULT_NUM_R = 2000
+DEFAULT_MAX_R = 2e6 ### cm
+DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
+
+DEFAULT_PROPS = ['R', 'M', 'Lambda']
+KNOWN_PROPS = ['R', 'M', 'Lambda', 'I', 'Mb']
+
+#-------------------------------------------------
 # INTERPOLATE CONTINUOUS FLUID VARIABLES FROM DISCRETE EOS DATA
 
 def tov(eospath,rhoc,props=['R','M','Lambda'],stp=1e1,pts=2e3,maxr=2e6,tol=1e1):
