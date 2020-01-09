@@ -124,7 +124,7 @@ def vals2MbMsun(R, vals, props): # M in Msun
     return Mb/Msun
 
 def dFdz(z):
-    return (5./(2.*z**6.))*(z*(-60.+z*(150.+z*(-110.+3.*z*(5.+z))))/(z-1.)**3+60.*np.log(1.-z))
+    return (5./(2.*z**6.)) * (z * (-60. + z*(150. + z*(-110. + 3.*z*(5. +z)))) / (z - 1.)**3 + 60.*np.log(1. - z))
 
 def vals2Lambda(R, vals, props): # dimensionless tidal deformability
     etaR = vals[props.index('Lambda')] # log derivative of metric perturbation at surface
@@ -180,4 +180,3 @@ def tov(mu, P, cs2i, Rho, rhoc, props=DEFAULT_PROPS, initial_r=DEFAULT_INITIAL_R
 
     # CALCULATE NS PROPERTIES AT SURFACE
     return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
-
