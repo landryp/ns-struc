@@ -142,12 +142,17 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX
     res.set_initial_value(y0, r0)
 
     ### step size in radius
-    dr = (max_r - r0) / num_r # fixed radial step size for data returned by integration
+    max_dr = (max_r - r0) / num_r # fixed radial step size for data returned by integration
 
     i = 0
     p_ind = props.index('R')
+#    p0 = y0[p_ind]
     while res.successful() and (res.y[p_ind] >= pressurec2_tol) and (i < num_r): # stop integration when pressure vanishes (to within tolerance tol)
-       	res.integrate(res.t+dr)
+#        guess_dr = 1.5 * res.t/(p0/res.y[p_ind] - 1) ### P * dR/dP ~ R / (P0/P - 1)
+                                                      ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
+#        res.integrate(res.t + min(max_dr, max(r0, guess_dr)))
+
+       	res.integrate(res.t + max_dr)
        	i += 1
 
     # CALCULATE NS PROPERTIES AT SURFACE
