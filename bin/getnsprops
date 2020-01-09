@@ -102,13 +102,16 @@ for eospath in args.eos:
 
     for i, rhoc in enumerate(properties[:,0]): # compute macroscopic properties for star of each central density
         properties[i,1:] = tov.tov(
-            [mu, P, cs2i, Rho],
+            mu,
+            P,
+            cs2i,
+            Rho,
             rhoc,
-            args.props,
-            args.initial_R,
-            args.num_R,
-            args.max_R,
-            args.pressurec2_tol,
+            props=args.props,
+            initial_r=args.initial_R,
+            num_r=args.num_R,
+            max_r=args.max_R,
+            pressurec2_tol=args.pressurec2_tol,
         )
 #        properties[i,1:] = tov.tov(
 #            mu,
