@@ -26,66 +26,42 @@ KNOWN_PROPS = ['R', 'M', 'Lambda', 'I', 'Mb']
 
 # DEFINE TOV AND PERTURBATION EQUATIONS
 
-def hydro(r,y,*args): # hydrostatic equilibrium
+def hydro(r, y, eps, cs2i, rho, props): # hydrostatic equilibrium
+    p = y[props.index('R')] # p in units of g/cm^3
+    m = y[props.index('M')] # m in units of cm*c^2/G
+    return -G*(eps(p)+p)*(m+4.*np.pi*r**3*p)/(c**2*r**2*(1.-2.*G*m/(c**2*r)))
+               
+def mass(r, y, eps, cs2i, Rho, props): # definition of the mass
+    p = y[props.index('R')] # p in units of g/cm^3
+    return 4.*np.pi*r**2*eps(p)
+       
+def baryonmass(r, y, eps, cs2i, rho, props): # definition of the baryonic mass
+    p = y[props.index('R')] # p in units of g/cm^3
+    m = y[props.index('M')] # m in units of cm*c^2/G
 
-       props = args[-1] # args expected as mu(p),1/cs2(p),rho(p),props
+    f = 1.-2.*G*m/(c**2*r)
+    return 4.*np.pi*r**2*rho(p)/f**0.5 
+       
+def equad(r, y, eps, cs2i, rho, props): # gravitoelectric quadrupole tidal perturbation
+    p = y[props.index('R')] # p in units of g/cm^3
+    m = y[props.index('M')] # m in units of cm*c^2/G
+    eta = y[props.index('Lambda')] # dimensionless logarithmic derivative of metric perturbation
 
-       p = y[props.index('R')] # p in units of g/cm^3
-       m = y[props.index('M')] # m in units of cm*c^2/G
-       mu = args[0] # mu in units of g/cm^3
-       
-       return -G*(mu(p)+p)*(m+4.*np.pi*r**3*p)/(c**2*r**2*(1.-2.*G*m/(c**2*r)))
-               
-def mass(r,y,*args): # definition of the mass
-       
-       props = args[-1]
-       
-       p = y[props.index('R')] # p in units of g/cm^3
-       mu = args[0] # mu in units of g/cm^3    
-               
-       return 4.*np.pi*r**2*mu(p) 
-       
-def baryonmass(r,y,*args): # definition of the baryonic mass
-       
-       props = args[-1]
-       
-       p = y[props.index('R')] # p in units of g/cm^3
-       m = y[props.index('M')] # m in units of cm*c^2/G
-       rho = args[2] # rho in units of g/cm^3  
-       
-       f = 1.-2.*G*m/(c**2*r)
-               
-       return 4.*np.pi*r**2*rho(p)/f**0.5 
-       
-def equad(r,y,*args): # gravitoelectric quadrupole tidal perturbation
-       
-       props = args[-1]
-       
-       p = y[props.index('R')] # p in units of g/cm^3
-       m = y[props.index('M')] # m in units of cm*c^2/G
-       eta = y[props.index('Lambda')] # dimensionless logarithmic derivative of metric perturbation
-       mu = args[0] # mu in units of g/cm^3
-       cs2i = args[1] # sound speed squared in units of c^2
-               
-       f = 1.-2.*G*m/(c**2*r)
-       A = (2./f)*(1.-3.*G*m/(c**2*r)-2.*G*np.pi*r**2*(mu(p)+3.*p)/c**2)
-       B = (1./f)*(6.-4.*G*np.pi*r**2*(mu(p)+p)*(3.+cs2i(p))/c**2)
-               
-       return (-1./r)*(eta*(eta-1.)+A*eta-B) # from Landry+Poisson PRD 89 (2014)
+    f = 1.-2.*G*m/(c**2*r)
+    A = (2./f)*(1.-3.*G*m/(c**2*r)-2.*G*np.pi*r**2*(eps(p)+3.*p)/c**2)
+    B = (1./f)*(6.-4.*G*np.pi*r**2*(eps(p)+p)*(3.+cs2i(p))/c**2)
 
-def slowrot(r,y,*args): # slow rotation equation
-       
-       props = args[-1]
-       
-       p = y[props.index('R')] # p in units of g/cm^3
-       m = y[props.index('M')] # m in units of cm*c^2/G
-       omega = y[props.index('I')] # log derivative of frame-dragging function
-       mu = args[0] # mu in units of g/cm^3
-       
-       f = 1.-2.*G*m/(c**2*r)  
-       P = 4.*np.pi*G*r**2*(mu(p)+p)/(c**2*f)
-               
-       return -(1./r)*(omega*(omega+3.)-P*(omega+4.))  
+    return (-1./r)*(eta*(eta-1.)+A*eta-B) # from Landry+Poisson PRD 89 (2014)
+
+def slowrot(r, y, eps, cs2i, rho, props): # slow rotation equation
+    p = y[props.index('R')] # p in units of g/cm^3
+    m = y[props.index('M')] # m in units of cm*c^2/G
+    omega = y[props.index('I')] # log derivative of frame-dragging function
+
+    f = 1.-2.*G*m/(c**2*r)
+    P = 4.*np.pi*G*r**2*(eps(p)+p)/(c**2*f)
+
+    return -(1./r)*(omega*(omega+3.)-P*(omega+4.))
 
 EQSDICT = {
     'R': hydro,
@@ -94,18 +70,22 @@ EQSDICT = {
     'I': slowrot,
      'Mb': baryonmass,
 }
+def define_efe(eps, cs2i, rho, props):
+    def efe(r, y):
+        return [EQSDICT[prop](r, y, eps, cs2i, rho, props) for prop in props]
+    return efe
 
 #-------------------------------------------------
 
 # INITIAL CONDITIONS
 
-def initconds(pc, muc, cs2ic, rhoc, initial_r, props):
+def initconds(pc, epsc, cs2ic, rhoc, initial_r, props):
     '''initial conditions for integration of eqs of stellar structure'''
 
-    Pc = pc - twopi * G_c2 * initial_r**2 * (pc + muc) * (3.*pc + muc) / 3.
-    mc = fourpi * initial_r**3 * muc / 3.
-    Lambdac = 2. + fourpi * G_c2 * initial_r**2 * (9.*pc + 13.*muc + 3.*(pc + muc)*cs2ic) / 21.
-    omegac = 16.*pi * G_c2 * initial_r**2 * (pc + muc) / 5.
+    Pc = pc - twopi * G_c2 * initial_r**2 * (pc + epsc) * (3.*pc + epsc) / 3.
+    mc = fourpi * initial_r**3 * epsc / 3.
+    Lambdac = 2. + fourpi * G_c2 * initial_r**2 * (9.*pc + 13.*epsc + 3.*(pc + epsc)*cs2ic) / 21.
+    omegac = 16.*pi * G_c2 * initial_r**2 * (pc + epsc) / 5.
     mbc = fourpi * initial_r**3 * rhoc / 3.
 
     startvals = {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
@@ -153,12 +133,7 @@ VALS2MACROS = {
 
 #-------------------------------------------------
 
-# INTERPOLATE CONTINUOUS FLUID VARIABLES FROM DISCRETE EOS DATA
-
-def define_efe(mu, P, cs2i, Rho, props):
-    def efe(r, y):
-        return [EQSDICT[prop](r,y,mu,cs2i,Rho,props) for prop in props]
-    return efe
+# INTEGRATE TOV AND FRIENDS
 
 def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL):
 

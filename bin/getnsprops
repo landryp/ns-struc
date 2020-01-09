@@ -88,13 +88,13 @@ for eospath in args.eos:
     energy_densityc2 = data['energy_densityc2'] # total energy density in units of g/cm^3
 
     ### define interpolators
-    Rho = interp1d(pressurec2, baryon_density, kind='linear', bounds_error=False, fill_value=0)
-    mu = interp1d(pressurec2, energy_densityc2, kind='linear', bounds_error=False, fill_value=0)
-    P = interp1d(baryon_density, pressurec2, kind='linear', bounds_error=False, fill_value=0)
+    rho = interp1d(pressurec2, baryon_density, kind='linear', bounds_error=False, fill_value=0)
+    eps = interp1d(pressurec2, energy_densityc2, kind='linear', bounds_error=False, fill_value=0)
     cs2i = interp1d(pressurec2, np.gradient(energy_densityc2, pressurec2), kind='linear', bounds_error=False, fill_value=0)
+    prs = interp1d(baryon_density, pressurec2, kind='linear', bounds_error=False, fill_value=0)
 
     ### define integration function, which will be re-used within iteration over rhoc
-    efe = tov.define_efe(mu, P, cs2i, Rho, args.props)
+    efe = tov.define_efe(eps, cs2i, rho, args.props)
 
     ### define grid for integration
     properties[:,0] = np.linspace(max(min_rhoc, baryon_density[0]), min(max_rhoc, baryon_density[-1]), args.num_rhoc)
@@ -103,11 +103,11 @@ for eospath in args.eos:
         print('Start at central density %.6e g/cm^3'%(properties[0,0]))
 
     for i, rhoc in enumerate(properties[:,0]): # compute macroscopic properties for star of each central density
-        pc = P(rhoc)
+        pc = prs(rhoc)
         properties[i,1:] = tov.tov(
-            efe,                                                                   ### equations
-            tov.initconds(pc, mu(pc), cs2i(pc), rhoc, args.initial_R, args.props), ### initial conditions
-            args.initial_R,                                                        ### initial radius
+            efe,                                                                    ### equations
+            tov.initconds(pc, eps(pc), cs2i(pc), rhoc, args.initial_R, args.props), ### initial conditions
+            args.initial_R,                                                         ### initial radius
             props=args.props,
             num_r=args.num_R,
             max_r=args.max_R,
