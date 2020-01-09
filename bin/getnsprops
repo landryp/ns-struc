@@ -56,12 +56,18 @@ parser.add_argument('-N', '--num-R', type=int, default=tov.DEFAULT_NUM_R,
     help='number of points for radial TOV integration')
 parser.add_argument('-m', '--max-R', type=float, default=tov.DEFAULT_MAX_R,
     help='radius endpoint in cm for surface finding algorithm')
+parser.add_argument('--max-dR', type=float, default=tov.DEFAULT_MAX_DR,
+    help='radius endpoint in cm for surface finding algorithm')
 parser.add_argument('-T', '--pressurec2-tol', type=float, default=tov.DEFAULT_PRESSUREC2_TOL,
     help='pressure tolerance for surface finding algorithm in g/cm^3')
 
 parser.add_argument('-v', '--verbose', action='store_true', default=False)
+parser.add_argument('-V', '--Verbose', action='store_true', default=False,
+    help='print how many iterations each integration took')
 
 args = parser.parse_args()
+
+args.verbose |= args.Verbose
 
 for prop in args.props:
     assert prop in tov.KNOWN_PROPS, 'prop=%s not understood!'%prop
@@ -110,8 +116,9 @@ for eospath in args.eos:
             args.initial_R,                                                         ### initial radius
             props=args.props,
             num_r=args.num_R,
-            max_r=args.max_R,
+            max_dr=args.max_dR,
             pressurec2_tol=args.pressurec2_tol,
+            verbose=args.Verbose,
         )
 
     macropath = eospath2macropath(eospath)

@@ -17,6 +17,7 @@ from .constants import *
 DEFAULT_INITIAL_R = 10 ### cm
 DEFAULT_NUM_R = 2000
 DEFAULT_MAX_R = 2e6 ### cm
+DEFAULT_MAX_DR = 1e5 ### cm
 DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
 
 DEFAULT_PROPS = ['R', 'M', 'Lambda']
@@ -151,38 +152,48 @@ VALS2MACROS = {
 
 # INTEGRATE TOV AND FRIENDS
 
-def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_r=DEFAULT_MAX_R, pressurec2_tol=DEFAULT_PRESSUREC2_TOL, verbose=True):
+def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MAX_DR, pressurec2_tol=DEFAULT_PRESSUREC2_TOL, verbose=False, warn=True):
 
     ### set up integrator
     res = ode(efe)
     res.set_initial_value(y0, r0)
 
-    ### step size in radius
-    max_dr = (max_r - r0) / num_r # fixed radial step size for data returned by integration
-
+    ### initialize the integration loop
     i = 0
-    p_ind = props.index('R')
-#    p0 = y0[p_ind]
+    p_ind = props.index('R') ### we can rely on this being present because it has to be for termination condition to make sense
+    p_old = y0[p_ind]
+    r_old = 0.
     while res.successful():
         if (res.y[p_ind] < pressurec2_tol): ### main termination condition
             break
 
         elif i < num_r: # stop integration when pressure vanishes (to within tolerance tol)
-#            guess_dr = 1.5 * res.t/(p0/res.y[p_ind] - 1) ### P * dR/dP ~ R / (P0/P - 1)
-                                                          ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
-#            res.integrate(res.t + min(max_dr, max(r0, guess_dr)))
+            if res.t != r_old:
+                guess_dr = 1.5 * (res.t - r_old) / (p_old/res.y[p_ind] - 1) ### P * dR/dP ~ P * (R - R0) / (P - P0) ~ (R - R0) / (P0/P - 1)
+                                                                  ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
+                dr = min(max_dr, max(r0, guess_dr))
 
-            res.integrate(res.t + max_dr)
+            else:
+                dr = max_dr
+
+            p_old = res.y[p_ind] ### update these for better estimates of slope moving forward
+            r_old = res.t
+
+            res.integrate(res.t + dr) ### actually integrate
             i += 1
 
         else:
-            if verbose:
+            if warn:
                 print('WARNING: integration did not find surface after %d iterations'%num_r)
             break
 
     else:
-        if verbose:
+        if warn:
             print('WARNING: integration was not successful!')
 
+    if verbose:
+        print('integration took %d steps'%i)
+
     # CALCULATE NS PROPERTIES AT SURFACE
+    ### FIXME: either interpolate or extrapolate to values when P=0 exactly?
     return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
