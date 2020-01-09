@@ -91,68 +91,62 @@ def eqsdict(): # dictionary linking NS properties with corresponding equation of
 
        return {'R': hydro,'M': mass,'Lambda': equad,'I': slowrot,'Mb': baryonmass}
 
+#-------------------------------------------------
+
 # INITIAL CONDITIONS
 
-def initconds(pc,muc,cs2ic,rhoc,stp,props): # initial conditions for integration of eqs of stellar structure
+def initconds(pc, muc, cs2ic, rhoc, initial_r, props):
+    '''initial conditions for integration of eqs of stellar structure'''
 
-       Pc = pc - 2.*np.pi*G*stp**2*(pc+muc)*(3.*pc+muc)/(3.*c**2)
-       mc = 4.*np.pi*stp**3*muc/3.
-       Lambdac = 2.+4.*np.pi*G*stp**2*(9.*pc+13.*muc+3.*(pc+muc)*cs2ic)/(21.*c**2)
-       omegac = 0.+16.*np.pi*G*stp**2*(pc+muc)/(5.*c**2)
-       mbc = 4.*np.pi*stp**3*rhoc/3.
-       
-       return {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
+    Pc = pc - twopi * G_c2 * initial_r**2 * (pc + muc) * (3.*pc + muc) / 3.
+    mc = fourpi * initial_r**3 * muc / 3.
+    Lambdac = 2. + fourpi * G_c2 * initial_r**2 * (9.*pc + 13.*muc + 3.*(pc + muc)*cs2ic) / 21.
+    omegac = 16.*pi * G_c2 * initial_r**2 * (pc + muc) / 5.
+    mbc = fourpi * initial_r**3 * rhoc / 3.
+
+    return {'R': Pc,'M': mc,'Lambda': Lambdac,'I': omegac, 'Mb': mc}
+
+#-------------------------------------------------
 
 # SURFACE VALUES
 
-def calcobs(vals,props): # calculate NS properties at stellar surface in desired units, given output surficial values from integrator
+# SURFACE VALUES to mactroscip observables
 
-       def Rkm(vals): # R in km
-      
-               R = vals[0]
-       
-               return R/1e5
-               
-       def MMsun(vals): # M in Msun
-       
-               M = vals[props.index('M')+1]
-       
-               return M/Msun
-               
-       def MbMsun(vals): # M in Msun
-       
-               Mb = vals[props.index('Mb')+1]
-       
-               return Mb/Msun
-               
-       def Lambda1(vals): # dimensionless tidal deformability
-       
-               etaR = vals[props.index('Lambda')+1] # log derivative of metric perturbation at surface
-       
-               C = G*vals[props.index('M')+1]/(c**2*vals[0]) # compactness
-               fR = 1.-2.*C
-       
-               F = hyp2f1(3.,5.,6.,2.*C) # a hypergeometric function
-               
-               def dFdz():
+def vals2Rkm(R, vals, props): # R in km
+    return R/1.e5
 
-                       z = 2.*C
+def vals2MMsun(R, vals, props): # M in Msun
+    M = vals[props.index('M')]
+    return M/Msun
 
-                       return (5./(2.*z**6.))*(z*(-60.+z*(150.+z*(-110.+3.*z*(5.+z))))/(z-1.)**3+60.*np.log(1.-z))
-       
-               RdFdr = -2.*C*dFdz() # log derivative of hypergeometric function
-               
-               k2el = 0.5*(etaR-2.-4.*C/fR)/(RdFdr-F*(etaR+3.-4.*C/fR)) # gravitoelectric quadrupole Love number
-       
-               return (2./3.)*(k2el/C**5)
-               
-       def MoI(vals):
-       
-               omegaR = vals[props.index('I')+1] # value of frame-dragging function at surface
-       
-               return 1e-45*(omegaR/(3.+omegaR))*c**2*vals[0]**3/(2.*G) # MoI in 10^45 g cm^2
+def vals2MbMsun(R, vals, props): # M in Msun
+    Mb = vals[props.index('Mb')]
+    return Mb/Msun
 
-       return {'R': Rkm,'M': MMsun,'Lambda': Lambda1,'I': MoI, 'Mb': MbMsun}   
+def dFdz(z):
+    return (5./(2.*z**6.))*(z*(-60.+z*(150.+z*(-110.+3.*z*(5.+z))))/(z-1.)**3+60.*np.log(1.-z))
+
+def vals2Lambda(R, vals, props): # dimensionless tidal deformability
+    etaR = vals[props.index('Lambda')] # log derivative of metric perturbation at surface
+    C = G_c2 * vals[props.index('M')] / R # compactness
+    fR = 1. - 2.*C
+    F = hyp2f1(3., 5., 6., 2.*C) # a hypergeometric function
+
+    RdFdr = -2. * C * dFdz(2.*C) # log derivative of hypergeometric function
+    k2el = 0.5 * (etaR - 2. - 4.*C/fR) / (RdFdr - F*(etaR + 3. - 4.*C/fR)) # gravitoelectric quadrupole Love number
+    return (2./3.) * (k2el / C**5)
+
+def vals2MoI(R, vals, props):
+    omegaR = vals[props.index('I')] # value of frame-dragging function at surface
+    return 1e-45 * (omegaR / (3. + omegaR)) * R**3 / (2.*G_c2) # MoI in 10^45 g cm^2
+
+VALS2MACROS = {
+    'R': vals2Rkm,
+    'M': vals2MMsun,
+    'Lambda': vals2Lambda,
+    'I': vals2MoI,
+    'Mb': vals2MbMsun,
+}
 
 #-------------------------------------------------
 
@@ -184,9 +178,6 @@ def tov(mu, P, cs2i, Rho, rhoc, props=DEFAULT_PROPS, initial_r=DEFAULT_INITIAL_R
        	i = i+1
        	res.integrate(res.t+dt)
 
-    vals = [res.t] + list(res.y)
-
     # CALCULATE NS PROPERTIES AT SURFACE
-    obs = calcobs(vals,props)
-    return [obs[prop](vals) for prop in props]
+    return [VALS2MACROS[prop](res.t, res.y, props) for prop in props]
 
