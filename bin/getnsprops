@@ -42,10 +42,8 @@ group = parser.add_argument_group('macroscopic arguments')
 
 group.add_argument('-r', '--rhoc-range', nargs=2, type=float, default=tov.DEFAULT_RHOC_RANGE,
     help='comma-separated min and max values for central density in units of rhonuc.')
-group.add_argument('--rtol-dM', type=float, default=tov.DEFAULT_RTOL_DM,
-    help='the maximum mass difference between neighboring rhoc allowed before the integration terminates')
-group.add_argument('--rtol-dR', type=float, default=tov.DEFAULT_RTOL_DR,
-    help='the maximum radius difference between neighboring rhoc allowed before the integration terminates')
+group.add_argument('--rtol', type=float, default=tov.DEFAULT_RTOL,
+    help='the maximum relative error allowed between neighboring points in the resulting properties arrays.')
 
 #---
 
@@ -123,8 +121,7 @@ for eospath in args.eos:
         max_num_r=args.max_num_R,
         max_dr=args.max_dR,
         pressurec2_tol=args.pressurec2_tol,
-        rtol_dm=args.rtol_dM,
-        rtol_dr=args.rtol_dR,
+        rtol=args.rtol,
         verbose=args.Verbose,
     )
 
