@@ -1,84 +1,134 @@
-#!/usr/bin/python
-__doc__ = 'GETNSPROPS -- calculate NS properties as a function of central density for selected EoSs'
-__usage__ = 'getnsprops EoS1.csv,EoS2.csv,... [-v] [-p R,M,Lambda,...] [-n 200] [-r 0.8,12] [-d ./eos/] [-o ./dat/]'
-__author__ = 'philippe.landry@ligo.org'
+#!/usr/bin/env python
+
+'GETNSPROPS -- calculate NS properties as a function of central density for selected EoSs'
+__author__ = 'philippe.landry@ligo.org and Reed Essick (reed.essick@gmail.com)'
 __date__ = '03-2019'
 
+#-------------------------------------------------
+
+import os
+
 import numpy as np
-from optparse import OptionParser
 from scipy.interpolate import interp1d
-from nsstruc.tov import tov
-from nsstruc.constants import *
-from nsstruc.pltsetup import *
 
-parser = OptionParser(usage=__usage__, description=__doc__)
-parser.add_option('-p', '--props', default='R,M,Lambda', help='comma-separated list of NS properties to calculate, DEFAULT=R,M,Lambda', metavar='R,M,Lambda')
-parser.add_option('-n', '--numrhoc', default=2e2, help='number of central densities to sample per EoS, DEFAULT=200', metavar='2e2')
-parser.add_option('-r', '--rhorng', default='0.8,1.2e1', help='comma-separated min and max values for central density in units of rhonuc, DEFAULT=0.8,1.2e1', metavar='0.8,1.2e1')
-parser.add_option('-s', '--stpi', default=1e1, help='starting step size for radial TOV integration in cm, DEFAULT=1e1', metavar='1e1')
-parser.add_option('-N', '--numpts', default=2e3, help='number of points for radial TOV integration, DEFAULT=2e3', metavar='2e3')
-parser.add_option('-m', '--maxr', default=2e6, help='radius endpoint in cm for surface finding algorithm, DEFAULT=2e6', metavar='2e6')
-parser.add_option('-T', '--tol', default=1e1, help='pressure tolerance for surface finding algorithm in g/cm^3, DEFAULT=1e1', metavar='1e1')
-parser.add_option('-d', '--dir', default='./eos/', help='path to directory housing EoS data, DEFAULT=./eos/', metavar='./eos/')
-parser.add_option('-o', '--outdir', default='./dat/', help='path to output directory, DEFAULT=./dat/', metavar='./dat/')
-parser.add_option('-t', '--tag', default='macro-', help='tag for output data file, DEFAULT=macro-', metavar='macro-')
-parser.add_option('-v', '--verbose', action='store_true', default=False, help='toggle verbose output, DEFAULT=False', metavar='False')
+from argparse import ArgumentParser
 
-opts, args = parser.parse_args()
-eosnames = str(args[0]).split(',')
-props = str(opts.props).split(',')
-numprops = len(props)
-rhorng = str(opts.rhorng).split(',')
-rhoi, rhof = [float(rho) for rho in rhorng]
-numrhoc = int(float(opts.numrhoc))
-stp = float(opts.stpi)
-numpts = int(float(opts.numpts))
-maxr = float(opts.maxr)
-tol = float(opts.tol)
-indir = str(opts.dir)
-outdir = str(opts.outdir)
-tag = str(opts.tag)
-verb = opts.verbose
+### non-standard libraries
+from nsstruc import tov
+from nsstruc.constants import rhonuc
 
-# CALCULATE NS PROPERTIES FOR EACH EOS
+#-------------------------------------------------
 
-for eosname in eosnames:
+OUTPATH_TEMPLATE = '%s/macro-%s'
+def eospath2macropath(path):
+    path = os.path.abspath(path)
+    return OUTPATH_TEMPLATE%(os.path.dirname(path), os.path.basename(path))
 
-	shortname = (eosname.split('.')[0]).split('eos-')[-1]
-	if verb == True: print 'Calculate properties of '+str(shortname)+' stars'
+#-------------------------------------------------
 
-	eospath = indir+eosname
-	outfile = open(outdir+tag+shortname+".csv","w")
-	outfile.write('rhoc,'+','.join(props)+'\n')
-	
-	eosdat = np.genfromtxt(eospath,names=True,delimiter=',')
-	rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
-	pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
-	mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
-	
-	rhop = interp1d(pdat,rhodat,kind='linear',bounds_error=False,fill_value=0)
-	def Rho(p): return rhop(p)
-	
-	mup = interp1d(pdat,mudat,kind='linear',bounds_error=False,fill_value=0)
-	def mu(p): return mup(p)
-		
-	prho = interp1d(rhodat,pdat,kind='linear',bounds_error=False,fill_value=0)
-	def P(rho): return prho(rho)
-		
-	cs2pi = interp1d(pdat,np.gradient(mudat,pdat),kind='linear', bounds_error=False, fill_value=0)
-	def cs2i(p): return cs2pi(p) # 1/sound speed squared
-	
-	rhocs = np.linspace(max(rhoi*rhonuc,rhodat[0]),min(rhof*rhonuc,rhodat[-1]),numrhoc)
-	
-	properties = np.zeros((numrhoc,numprops+1))
-	
-	i = 0
-	if verb == True: print 'Start at central density {0} g/cm^3'.format(rhocs[0])
-	for rhoc in rhocs: # compute macroscopic properties for star of each central density
-	
-		macro = tov([mu,P,cs2i,Rho],rhoc,props,stp,numpts,maxr,tol)
-		properties[i] = [item for List in [[rhoc],macro] for item in List]
-		i = i+1
+parser = ArgumentParser(description=__doc__)
 
-	if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
-	np.savetxt(outfile,properties,delimiter=',')
+#---
+
+group = parser.add_argument_group('required arguments')
+
+group.add_argument('eos', nargs='+', type=str)
+group.add_argument('-p', '--props', nargs='+', type=str, default=tov.DEFAULT_PROPS,
+    help='list of NS properties to calculate, DEFAULT=%s'%tov.DEFAULT_PROPS)
+
+#---
+
+group = parser.add_argument_group('macroscopic arguments')
+
+group.add_argument('-r', '--rhoc-range', nargs=2, type=float, default=tov.DEFAULT_RHOC_RANGE,
+    help='comma-separated min and max values for central density in units of rhonuc.')
+group.add_argument('--rtol', type=float, default=tov.DEFAULT_RTOL,
+    help='the maximum relative error allowed between neighboring points in the resulting properties arrays.')
+
+#---
+
+group = parser.add_argument_group('individual TOV arguments')
+
+group.add_argument('-s', '--initial-R', type=float, default=tov.DEFAULT_INITIAL_R,
+    help='starting point for radial TOV integration in cm. Should be small.')
+group.add_argument('-N', '--max-num-R', type=int, default=tov.DEFAULT_MAX_NUM_R,
+    help='number of points for radial TOV integration')
+group.add_argument('--max-dR', type=float, default=tov.DEFAULT_MAX_DR,
+    help='radius endpoint in cm for surface finding algorithm')
+group.add_argument('-T', '--pressurec2-tol', type=float, default=tov.DEFAULT_PRESSUREC2_TOL,
+    help='pressure tolerance for surface finding algorithm in g/cm^3')
+
+#---
+
+group = parser.add_argument_group('verbosity arguments')
+
+group.add_argument('-v', '--verbose', action='store_true', default=False)
+group.add_argument('-V', '--Verbose', action='store_true', default=False,
+    help='print how many iterations each integration took')
+
+#---
+
+args = parser.parse_args()
+
+args.verbose |= args.Verbose
+
+for prop in args.props:
+    assert prop in tov.KNOWN_PROPS, 'prop=%s not understood!'%prop
+
+if 'R' not in args.props: ### we must have this present because integration termination condition is based on finding R!
+    args.props.append('R')
+if 'M' not in args.props:
+    args.props.append('M')
+
+header = 'rhoc,'+','.join(args.props)
+
+min_rhoc, max_rhoc = np.array(args.rhoc_range)*rhonuc
+
+#-------------------------------------------------
+
+### CALCULATE NS PROPERTIES FOR EACH EOS
+
+for eospath in args.eos:
+    if args.verbose:
+        print('Calculating properties from: %s'%eospath)
+
+    ### load data
+    data = np.genfromtxt(eospath, names=True, delimiter=',')
+    baryon_density = data['baryon_density']     # rest-mass energy density in units of g/cm^3
+    pressurec2 = data['pressurec2']             # pressure in units of g/cm^3
+    energy_densityc2 = data['energy_densityc2'] # total energy density in units of g/cm^3
+
+    ### define interpolators
+    rho = interp1d(pressurec2, baryon_density, kind='linear', bounds_error=False, fill_value=0)
+    eps = interp1d(pressurec2, energy_densityc2, kind='linear', bounds_error=False, fill_value=0)
+    cs2i = interp1d(pressurec2, np.gradient(energy_densityc2, pressurec2), kind='linear', bounds_error=False, fill_value=0)
+    prs = interp1d(baryon_density, pressurec2, kind='linear', bounds_error=False, fill_value=0)
+
+    ### define integration function, which will be re-used within iteration over rhoc
+    efe = tov.define_efe(eps, cs2i, rho, args.props)
+
+    ### integrate until we hit the required spacing for M, R, Lambda
+    properties = tov.foliate(
+        efe,
+        prs,
+        rho,
+        eps,
+        cs2i,
+        args.initial_R,
+        props=args.props,
+        min_rhoc=max(min_rhoc, baryon_density[0]),  # need to add a warning if baryon_density limits this instead of min_rhoc?
+        max_rhoc=min(max_rhoc, baryon_density[-1]), # same for max_rhoc?
+        max_num_r=args.max_num_R,
+        max_dr=args.max_dR,
+        pressurec2_tol=args.pressurec2_tol,
+        rtol=args.rtol,
+        verbose=args.Verbose,
+    )
+
+    if args.verbose:
+        print('integrated a total of %d stellar models'%len(properties))
+
+    macropath = eospath2macropath(eospath)
+    if args.verbose:
+        print('Saving: %s'%macropath)
+    np.savetxt(macropath, properties, delimiter=',', comments='', header=header)
