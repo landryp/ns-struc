@@ -27,8 +27,7 @@ DEFAULT_MIN_RHOC = 0.8
 DEFAULT_MAX_RHOC = 12.0
 DEFAULT_RHOC_RANGE = [DEFAULT_MIN_RHOC, DEFAULT_MAX_RHOC]
 
-DEFAULT_RTOL_DM = 0.1 # Msun
-DEFAULT_RTOL_DR = 0.1 # km
+DEFAULT_RTOL = 0.1
 
 #-------------------------------------------------
 
@@ -237,8 +236,7 @@ def foliate(
         pressurec2_tol=DEFAULT_PRESSUREC2_TOL,
         min_rhoc=DEFAULT_MIN_RHOC,
         max_rhoc=DEFAULT_MAX_RHOC,
-        rtol_dm=DEFAULT_RTOL_DM,
-        rtol_dr=DEFAULT_RTOL_DR,
+        rtol=DEFAULT_RTOL,
         verbose=False,
         warn=True,
         min_props=None, # allow us to recurse without repeating work
@@ -260,7 +258,6 @@ def foliate(
             pressurec2_tol=pressurec2_tol,
             verbose=verbose,
         )
-    properties.append([min_rhoc]+min_props)
 
     # compute the properties at the highest rhoc
     if max_props is None:
@@ -275,49 +272,30 @@ def foliate(
             pressurec2_tol=pressurec2_tol,
             verbose=verbose,
         )
-    properties.append([max_rhoc]+max_props)
+
+    ### compute the mid point so we can estimate interpolator error
+    mid_rhoc = 0.5*(min_rhoc + max_rhoc)
+    # integrate properties at the bisection point
+    pc = rho2p(mid_rhoc)
+    mid_props = tov(
+        efe,
+        initconds(pc, p2eps(pc), p2cs2i(pc), mid_rhoc, r0, props),
+        r0,
+        props=props,
+        max_num_r=max_num_r,
+        max_dr=max_dr,
+        pressurec2_tol=pressurec2_tol,
+        verbose=verbose,
+    )
 
     ### check to see whether we need to bisect
-    bisect = False
-
-    # check for radius convergence
-    if r_ind is None:
-        r_ind = props.index('R')
-
-    min_R = min_props[r_ind]
-    max_R = max_props[r_ind]
-
-    bisect |= abs(max_R-min_R) > rtol_dr * 0.5*(max_R+min_R)
-
-    # check for mass convergence
-    if m_ind is None:
-        m_ind = props.index('M')
-
-    min_M = min_props[m_ind]
-    max_M = max_props[m_ind]
-
-    bisect |= abs(max_M-min_M) > rtol_dm * 0.5*(max_M+min_M)
-
-    ### NOTE: we can easily add other conditionals here to define convergence...
+    ### we're doing a bisection search, so the linear interp between min_rhoc and max_rhoc is easy
+    ### note, we check for interpolator error on all macroscopic properties
+    amid_props = np.array(mid_props)
+    bisect = np.any(np.abs(0.5*(np.array(max_props)+np.array(min_props)) -  amid_props) > rtol * amid_props)
 
     ### condition on whether we are accurate enough
     if bisect: ### we need to divide and recurse
-        ### bisect rhoc
-        mid_rhoc = 0.5*(min_rhoc + max_rhoc)
-
-        ### integrate properties at the bisection point
-        pc = rho2p(mid_rhoc)
-        mid_props = tov(
-            efe,
-            initconds(pc, p2eps(pc), p2cs2i(pc), mid_rhoc, r0, props),
-            r0,
-            props=props,
-            max_num_r=max_num_r,
-            max_dr=max_dr,
-            pressurec2_tol=pressurec2_tol,
-            verbose=verbose,
-        )
-
         ### set up arguments for recursive calls
         args = (efe, rho2p, p2rho, p2eps, p2cs2i, r0)
         kwargs = {
@@ -327,8 +305,7 @@ def foliate(
             'max_num_r':max_num_r,
             'max_dr':max_dr,
             'pressurec2_tol':pressurec2_tol,
-            'rtol_dm':rtol_dm,
-            'rtol_dr':rtol_dr,
+            'rtol':rtol,
             'verbose':verbose,
             'warn':warn,
         }
@@ -355,4 +332,4 @@ def foliate(
         return left + right[1:] ### don't return the repeated mid-point
 
     else: ### we have converged within this range of rhoc
-        return properties
+        return [[min_rhoc]+min_props, [mid_rhoc]+mid_props, [max_rhoc]+max_props]
