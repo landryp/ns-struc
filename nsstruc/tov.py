@@ -291,26 +291,11 @@ def foliate(
     ### check to see whether we need to bisect
     ### we're doing a bisection search, so the linear interp between min_rhoc and max_rhoc is easy
     ### note, we check for interpolator error on all macroscopic properties
-    bisect = np.any(0.5*(np.array(max_props)+np.array(min_props)) > rtol * np.array(mid_props))
+    amid_props = np.array(mid_props)
+    bisect = np.any(np.abs(0.5*(np.array(max_props)+np.array(min_props)) -  amid_props) > rtol * amid_props)
 
     ### condition on whether we are accurate enough
     if bisect: ### we need to divide and recurse
-        ### bisect rhoc
-        mid_rhoc = 0.5*(min_rhoc + max_rhoc)
-
-        ### integrate properties at the bisection point
-        pc = rho2p(mid_rhoc)
-        mid_props = tov(
-            efe,
-            initconds(pc, p2eps(pc), p2cs2i(pc), mid_rhoc, r0, props),
-            r0,
-            props=props,
-            max_num_r=max_num_r,
-            max_dr=max_dr,
-            pressurec2_tol=pressurec2_tol,
-            verbose=verbose,
-        )
-
         ### set up arguments for recursive calls
         args = (efe, rho2p, p2rho, p2eps, p2cs2i, r0)
         kwargs = {
@@ -347,4 +332,4 @@ def foliate(
         return left + right[1:] ### don't return the repeated mid-point
 
     else: ### we have converged within this range of rhoc
-        return [[min_rhoc]+min_props, [mid_rhoc]+mid_props, max_rhoc+max_props]
+        return [[min_rhoc]+min_props, [mid_rhoc]+mid_props, [max_rhoc]+max_props]
