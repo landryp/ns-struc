@@ -15,11 +15,20 @@ from .constants import *
 #-------------------------------------------------
 
 DEFAULT_INITIAL_R = 10 ### cm
-DEFAULT_NUM_R = 2000
+DEFAULT_MAX_NUM_R = 2000
 DEFAULT_MAX_DR = 1e5 ### cm
 DEFAULT_PRESSUREC2_TOL = 10 ### g/cm^3
 
 DEFAULT_PROPS = ['R', 'M', 'Lambda']
+
+#------------------------
+
+DEFAULT_MIN_RHOC = 0.8
+DEFAULT_MAX_RHOC = 12.0
+DEFAULT_RHOC_RANGE = [DEFAULT_MIN_RHOC, DEFAULT_MAX_RHOC]
+
+DEFAULT_RTOL_DM = 0.1 # Msun
+DEFAULT_RTOL_DR = 0.1 # km
 
 #-------------------------------------------------
 
@@ -151,7 +160,18 @@ VALS2MACROS = {
 
 # INTEGRATE TOV AND FRIENDS
 
-def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MAX_DR, pressurec2_tol=DEFAULT_PRESSUREC2_TOL, verbose=False, warn=True):
+def tov(
+        efe,
+        y0,
+        r0,
+        props=DEFAULT_PROPS,
+        max_num_r=DEFAULT_MAX_NUM_R,
+        max_dr=DEFAULT_MAX_DR,
+        pressurec2_tol=DEFAULT_PRESSUREC2_TOL,
+        verbose=False,
+        warn=True,
+    ):
+    '''integrate the structure equations for these initial conditions'''
 
     ### set up integrator
     res = ode(efe)
@@ -166,7 +186,7 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
         if (res.y[p_ind] < pressurec2_tol): ### main termination condition
             break
 
-        elif i < num_r: # stop integration when pressure vanishes (to within tolerance tol)
+        elif i < max_num_r: # stop integration when pressure vanishes (to within tolerance tol)
             if y_old[p_ind] != res.y[p_ind]:
                 guess_dr = 1.5 * (res.t - r_old) / (y_old[p_ind]/res.y[p_ind] - 1) ### P * dR/dP ~ P * (R - R0) / (P - P0) ~ (R - R0) / (P0/P - 1)
                                                                   ### factor of 1.5 is so that we don't get stuck in Zeno's paradox
@@ -183,7 +203,7 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
 
         else:
             if warn:
-                print('WARNING: integration did not find surface after %d iterations'%num_r)
+                print('WARNING: integration did not find surface after %d iterations'%max_num_r)
             break
 
     else:
@@ -201,3 +221,138 @@ def tov(efe, y0, r0, props=DEFAULT_PROPS, num_r=DEFAULT_NUM_R, max_dr=DEFAULT_MA
     y = (res.y-y_old)*frac + res.y
 
     return [VALS2MACROS[prop](R, y, props) for prop in props]
+
+def foliate(
+        efe,
+        rho2p,
+        p2rho,
+        p2eps,
+        p2cs2i,
+        r0,
+        props=DEFAULT_PROPS,
+        m_ind=None,
+        r_ind=None,
+        max_num_r=DEFAULT_MAX_NUM_R,
+        max_dr=DEFAULT_MAX_DR,
+        pressurec2_tol=DEFAULT_PRESSUREC2_TOL,
+        min_rhoc=DEFAULT_MIN_RHOC,
+        max_rhoc=DEFAULT_MAX_RHOC,
+        rtol_dm=DEFAULT_RTOL_DM,
+        rtol_dr=DEFAULT_RTOL_DR,
+        verbose=False,
+        warn=True,
+        min_props=None, # allow us to recurse without repeating work
+        max_props=None,
+    ):
+    '''perform a bisection search until the macroscopic quantities are sampled densely enough'''
+
+    # compute the properties at the lowest rhoc
+    properties = []
+    if min_props is None:
+        pc = rho2p(min_rhoc)
+        min_props = tov(
+            efe,
+            initconds(pc, p2eps(pc), p2cs2i(pc), min_rhoc, r0, props),
+            r0,
+            props=props,
+            max_num_r=max_num_r,
+            max_dr=max_dr,
+            pressurec2_tol=pressurec2_tol,
+            verbose=verbose,
+        )
+    properties.append([min_rhoc]+min_props)
+
+    # compute the properties at the highest rhoc
+    if max_props is None:
+        pc = rho2p(max_rhoc)
+        max_props = tov(
+            efe,
+            initconds(pc, p2eps(pc), p2cs2i(pc), max_rhoc, r0, props),
+            r0,
+            props=props,
+            max_num_r=max_num_r,
+            max_dr=max_dr,
+            pressurec2_tol=pressurec2_tol,
+            verbose=verbose,
+        )
+    properties.append([max_rhoc]+max_props)
+
+    ### check to see whether we need to bisect
+    bisect = False
+
+    # check for radius convergence
+    if r_ind is None:
+        r_ind = props.index('R')
+
+    min_R = min_props[r_ind]
+    max_R = max_props[r_ind]
+
+    bisect |= abs(max_R-min_R) > rtol_dr * 0.5*(max_R+min_R)
+
+    # check for mass convergence
+    if m_ind is None:
+        m_ind = props.index('M')
+
+    min_M = min_props[m_ind]
+    max_M = max_props[m_ind]
+
+    bisect |= abs(max_M-min_M) > rtol_dm * 0.5*(max_M+min_M)
+
+    ### NOTE: we can easily add other conditionals here to define convergence...
+
+    ### condition on whether we are accurate enough
+    if bisect: ### we need to divide and recurse
+        ### bisect rhoc
+        mid_rhoc = 0.5*(min_rhoc + max_rhoc)
+
+        ### integrate properties at the bisection point
+        pc = rho2p(mid_rhoc)
+        mid_props = tov(
+            efe,
+            initconds(pc, p2eps(pc), p2cs2i(pc), mid_rhoc, r0, props),
+            r0,
+            props=props,
+            max_num_r=max_num_r,
+            max_dr=max_dr,
+            pressurec2_tol=pressurec2_tol,
+            verbose=verbose,
+        )
+
+        ### set up arguments for recursive calls
+        args = (efe, rho2p, p2rho, p2eps, p2cs2i, r0)
+        kwargs = {
+            'props':props,
+            'm_ind':m_ind,
+            'r_ind':r_ind,
+            'max_num_r':max_num_r,
+            'max_dr':max_dr,
+            'pressurec2_tol':pressurec2_tol,
+            'rtol_dm':rtol_dm,
+            'rtol_dr':rtol_dr,
+            'verbose':verbose,
+            'warn':warn,
+        }
+
+        # low rhoc recursive call
+        kwargs.update({
+            'min_rhoc':min_rhoc,
+            'max_rhoc':mid_rhoc,
+            'min_props':min_props,
+            'max_props':mid_props,
+        })
+        left = foliate(*args, **kwargs)
+
+        # high rhoc recursive call
+        kwargs.update({
+            'min_rhoc':mid_rhoc,
+            'max_rhoc':max_rhoc,
+            'min_props':mid_props,
+            'max_props':max_props,
+        })
+        right = foliate(*args, **kwargs)
+
+        # return the result
+        return left + right[1:] ### don't return the repeated mid-point
+
+    else: ### we have converged within this range of rhoc
+        return properties

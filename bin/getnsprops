@@ -19,13 +19,6 @@ from nsstruc.constants import rhonuc
 
 #-------------------------------------------------
 
-DEFAULT_NUM_RHOC = 200
-DEFAULT_MIN_RHOC = 0.8
-DEFAULT_MAX_RHOC = 12.0
-DEFAULT_RHOC_RANGE = [DEFAULT_MIN_RHOC, DEFAULT_MAX_RHOC]
-
-#-------------------------------------------------
-
 OUTPATH_TEMPLATE = '%s/macro-%s'
 def eospath2macropath(path):
     path = os.path.abspath(path)
@@ -35,28 +28,47 @@ def eospath2macropath(path):
 
 parser = ArgumentParser(description=__doc__)
 
-parser.add_argument('eos', nargs='+', type=str)
+#---
 
-parser.add_argument('-p', '--props', nargs='+', type=str, default=tov.DEFAULT_PROPS,
+group = parser.add_argument_group('required arguments')
+
+group.add_argument('eos', nargs='+', type=str)
+group.add_argument('-p', '--props', nargs='+', type=str, default=tov.DEFAULT_PROPS,
     help='list of NS properties to calculate, DEFAULT=%s'%tov.DEFAULT_PROPS)
 
-parser.add_argument('-n', '--num-rhoc', type=int, default=DEFAULT_NUM_RHOC,
-    help='number of central densities to sample per EoS')
-parser.add_argument('-r', '--rhoc-range', nargs=2, type=float, default=DEFAULT_RHOC_RANGE,
-    help='comma-separated min and max values for central density in units of rhonuc.')
+#---
 
-parser.add_argument('-s', '--initial-R', type=float, default=tov.DEFAULT_INITIAL_R,
+group = parser.add_argument_group('macroscopic arguments')
+
+group.add_argument('-r', '--rhoc-range', nargs=2, type=float, default=tov.DEFAULT_RHOC_RANGE,
+    help='comma-separated min and max values for central density in units of rhonuc.')
+group.add_argument('--rtol-dM', type=float, default=tov.DEFAULT_RTOL_DM,
+    help='the maximum mass difference between neighboring rhoc allowed before the integration terminates')
+group.add_argument('--rtol-dR', type=float, default=tov.DEFAULT_RTOL_DR,
+    help='the maximum radius difference between neighboring rhoc allowed before the integration terminates')
+
+#---
+
+group = parser.add_argument_group('individual TOV arguments')
+
+group.add_argument('-s', '--initial-R', type=float, default=tov.DEFAULT_INITIAL_R,
     help='starting point for radial TOV integration in cm. Should be small.')
-parser.add_argument('-N', '--num-R', type=int, default=tov.DEFAULT_NUM_R,
+group.add_argument('-N', '--max-num-R', type=int, default=tov.DEFAULT_MAX_NUM_R,
     help='number of points for radial TOV integration')
-parser.add_argument('--max-dR', type=float, default=tov.DEFAULT_MAX_DR,
+group.add_argument('--max-dR', type=float, default=tov.DEFAULT_MAX_DR,
     help='radius endpoint in cm for surface finding algorithm')
-parser.add_argument('-T', '--pressurec2-tol', type=float, default=tov.DEFAULT_PRESSUREC2_TOL,
+group.add_argument('-T', '--pressurec2-tol', type=float, default=tov.DEFAULT_PRESSUREC2_TOL,
     help='pressure tolerance for surface finding algorithm in g/cm^3')
 
-parser.add_argument('-v', '--verbose', action='store_true', default=False)
-parser.add_argument('-V', '--Verbose', action='store_true', default=False,
+#---
+
+group = parser.add_argument_group('verbosity arguments')
+
+group.add_argument('-v', '--verbose', action='store_true', default=False)
+group.add_argument('-V', '--Verbose', action='store_true', default=False,
     help='print how many iterations each integration took')
+
+#---
 
 args = parser.parse_args()
 
@@ -64,8 +76,12 @@ args.verbose |= args.Verbose
 
 for prop in args.props:
     assert prop in tov.KNOWN_PROPS, 'prop=%s not understood!'%prop
+
 if 'R' not in args.props: ### we must have this present because integration termination condition is based on finding R!
     args.props.append('R')
+if 'M' not in args.props:
+    args.props.append('M')
+
 header = 'rhoc,'+','.join(args.props)
 
 min_rhoc, max_rhoc = np.array(args.rhoc_range)*rhonuc
@@ -73,8 +89,6 @@ min_rhoc, max_rhoc = np.array(args.rhoc_range)*rhonuc
 #-------------------------------------------------
 
 ### CALCULATE NS PROPERTIES FOR EACH EOS
-properties = np.empty((args.num_rhoc, len(args.props)+1), dtype=float) ### place-holder for fixed-sized integration
-                                                                       ### FIXME: will want to move this inside the loop for adaptive grid placement...
 
 for eospath in args.eos:
     if args.verbose:
@@ -95,26 +109,29 @@ for eospath in args.eos:
     ### define integration function, which will be re-used within iteration over rhoc
     efe = tov.define_efe(eps, cs2i, rho, args.props)
 
-    ### define grid for integration
-    properties[:,0] = np.linspace(max(min_rhoc, baryon_density[0]), min(max_rhoc, baryon_density[-1]), args.num_rhoc)
+    ### integrate until we hit the required spacing for M, R, Lambda
+    properties = tov.foliate(
+        efe,
+        prs,
+        rho,
+        eps,
+        cs2i,
+        args.initial_R,
+        props=args.props,
+        min_rhoc=max(min_rhoc, baryon_density[0]),  # need to add a warning if baryon_density limits this instead of min_rhoc?
+        max_rhoc=min(max_rhoc, baryon_density[-1]), # same for max_rhoc?
+        max_num_r=args.max_num_R,
+        max_dr=args.max_dR,
+        pressurec2_tol=args.pressurec2_tol,
+        rtol_dm=args.rtol_dM,
+        rtol_dr=args.rtol_dR,
+        verbose=args.Verbose,
+    )
 
     if args.verbose:
-        print('Start at central density %.6e g/cm^3'%(properties[0,0]))
-
-    for i, rhoc in enumerate(properties[:,0]): # compute macroscopic properties for star of each central density
-        pc = prs(rhoc)
-        properties[i,1:] = tov.tov(
-            efe,                                                                    ### equations
-            tov.initconds(pc, eps(pc), cs2i(pc), rhoc, args.initial_R, args.props), ### initial conditions
-            args.initial_R,                                                         ### initial radius
-            props=args.props,
-            num_r=args.num_R,
-            max_dr=args.max_dR,
-            pressurec2_tol=args.pressurec2_tol,
-            verbose=args.Verbose,
-        )
+        print('integrated a total of %d stellar models'%len(properties))
 
     macropath = eospath2macropath(eospath)
     if args.verbose:
-        print('Done at central density %.6e g/cm^3\nSaving: %s'%(properties[-1,-1], macropath))
+        print('Saving: %s'%macropath)
     np.savetxt(macropath, properties, delimiter=',', comments='', header=header)
