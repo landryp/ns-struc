@@ -15,10 +15,10 @@ parser = OptionParser(usage=__usage__, description=__doc__)
 parser.add_option('-p', '--props', default='R,M,Lambda', help='comma-separated list of NS properties to calculate, DEFAULT=R,M,Lambda', metavar='R,M,Lambda')
 parser.add_option('-n', '--numrhoc', default=2e2, help='number of central densities to sample per EoS, DEFAULT=200', metavar='2e2')
 parser.add_option('-r', '--rhorng', default='0.8,1.2e1', help='comma-separated min and max values for central density in units of rhonuc, DEFAULT=0.8,1.2e1', metavar='0.8,1.2e1')
-parser.add_option('-s', '--stpi', default=1e1, help='starting step size for radial TOV integration in cm, DEFAULT=1e1', metavar='1e1')
-parser.add_option('-N', '--numpts', default=2e3, help='number of points for radial TOV integration, DEFAULT=2e3', metavar='2e3')
-parser.add_option('-m', '--maxr', default=2e6, help='radius endpoint in cm for surface finding algorithm, DEFAULT=2e6', metavar='2e6')
-parser.add_option('-T', '--tol', default=1e1, help='pressure tolerance for surface finding algorithm in g/cm^3, DEFAULT=1e1', metavar='1e1')
+parser.add_option('-m', '--mrng', default=False, help='use mass range instead of central density range, DEFAULT=False', metavar='Mmin,Mmax')
+parser.add_option('-s', '--stpi', default=1e-4, help='starting fractional enthalpy step size for TOV integration, DEFAULT=1e-4', metavar='1e-4')
+parser.add_option('-N', '--numpts', default=2e3, help='number of enthalpy points for TOV integration, DEFAULT=2e3', metavar='2e3')
+parser.add_option('-T', '--tol', default=5e1, help='pressure tolerance for surface finding algorithm in g/cm^3, DEFAULT=5e1', metavar='5e1')
 parser.add_option('-d', '--dir', default='./eos/', help='path to directory housing EoS data, DEFAULT=./eos/', metavar='./eos/')
 parser.add_option('-o', '--outdir', default='./dat/', help='path to output directory, DEFAULT=./dat/', metavar='./dat/')
 parser.add_option('-t', '--tag', default='macro-', help='tag for output data file, DEFAULT=macro-', metavar='macro-')
@@ -31,9 +31,10 @@ numprops = len(props)
 rhorng = str(opts.rhorng).split(',')
 rhoi, rhof = [float(rho) for rho in rhorng]
 numrhoc = int(float(opts.numrhoc))
+if opts.mrng:
+	mmin, mmax = [float(m) for m in opts.mrng.split(',')]
 stp = float(opts.stpi)
 numpts = int(float(opts.numpts))
-maxr = float(opts.maxr)
 tol = float(opts.tol)
 indir = str(opts.dir)
 outdir = str(opts.outdir)
@@ -48,11 +49,8 @@ for eosname in eosnames:
 	if verb == True: print 'Calculate properties of '+str(shortname)+' stars'
 
 	eospath = indir+eosname
-	outfile = open(outdir+tag+shortname+".csv","w")
-	outfile.write('rhoc,'+','.join(props)+'\n')
-	
 	eosdat = np.genfromtxt(eospath,names=True,delimiter=',')
-	rhodat = eosdat['baryon_density'] # rest-mass energy density in units of g/cm^3
+	rhodat = eosdat['baryon_density'] # rest-mass energy density in g/cm^3
 	pdat = eosdat['pressurec2'] # pressure in units of g/cm^3
 	mudat = eosdat['energy_densityc2'] # total energy density in units of g/cm^3
 	
@@ -64,21 +62,47 @@ for eosname in eosnames:
 		
 	prho = interp1d(rhodat,pdat,kind='linear',bounds_error=False,fill_value=0)
 	def P(rho): return prho(rho)
-		
+	
 	cs2pi = interp1d(pdat,np.gradient(mudat,pdat),kind='linear', bounds_error=False, fill_value=0)
 	def cs2i(p): return cs2pi(p) # 1/sound speed squared
 	
 	rhocs = np.linspace(max(rhoi*rhonuc,rhodat[0]),min(rhof*rhonuc,rhodat[-1]),numrhoc)
 	
 	properties = np.zeros((numrhoc,numprops+1))
+	props = ['pR']+props
+
+	idx = 0
+	idxs = {}
+	for prop in ['pR','M','R','Lambda','I','Mb']:
+		if prop in props:
+			idxs[prop] = idx
+			idx = idx + 1
 	
-	i = 0
-	if verb == True: print 'Start at central density {0} g/cm^3'.format(rhocs[0])
-	for rhoc in rhocs: # compute macroscopic properties for star of each central density
+	if opts.mrng:
+		if verb == True: print 'Start at mass {0} Msun'.format(mmin)
+	else:
+		if verb == True: print 'Start at central density {0} g/cm^3'.format(rhocs[0])
+
+	i = numrhoc/2 - 1 # start at midpoint in rhoc		
+	for rhoc in list(reversed(rhocs[:numrhoc/2])): # compute macroscopic properties for star of each central density
+		macro = tov([mu,P,cs2i,Rho],rhoc,props,idxs,stp,numpts,tol)[1:]
+		if opts.mrng:
+			if macro[0] < mmin: break
+		properties[i] = [item for List in [[rhoc],macro] for item in List]
+		i = i-1
 	
-		macro = tov([mu,P,cs2i,Rho],rhoc,props,stp,numpts,maxr,tol)
+	i = numrhoc/2 # continue in other direction from midpoint
+	for rhoc in rhocs[len(rhocs)/2:]: # compute macroscopic properties for star of each central density
+		macro = tov([mu,P,cs2i,Rho],rhoc,props,idxs,stp,numpts,tol)[1:]
+		if opts.mrng:
+			if macro[0] > mmax: break
 		properties[i] = [item for List in [[rhoc],macro] for item in List]
 		i = i+1
 
-	if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
-	np.savetxt(outfile,properties,delimiter=',')
+	if opts.mrng:
+		if verb == True: print 'Done at mass {0} Msun'.format(mmax)
+	else:
+		if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
+
+	properties = properties[~np.all(properties == 0, axis=1)] # drop zeroed rows
+	np.savetxt(outdir+tag+shortname+".csv", properties, delimiter=',', header='rhoc,'+','.join(props[1:]), comments='')
