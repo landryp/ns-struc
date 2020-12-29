@@ -26,8 +26,8 @@ parser.add_option('-v', '--verbose', action='store_true', default=False, help='t
 
 opts, args = parser.parse_args()
 eosnames = str(args[0]).split(',')
-props = str(opts.props).split(',')
-numprops = len(props)
+propslist = str(opts.props).split(',')
+numprops = len(propslist)
 rhorng = str(opts.rhorng).split(',')
 rhoi, rhof = [float(rho) for rho in rhorng]
 numrhoc = int(float(opts.numrhoc))
@@ -69,7 +69,7 @@ for eosname in eosnames:
 	rhocs = np.linspace(max(rhoi*rhonuc,rhodat[0]),min(rhof*rhonuc,rhodat[-1]),numrhoc)
 	
 	properties = np.zeros((numrhoc,numprops+1))
-	props = ['pR']+props
+	props = ['pR']+propslist
 
 	idx = 0
 	idxs = {}
@@ -105,4 +105,4 @@ for eosname in eosnames:
 		if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
 
 	properties = properties[~np.all(properties == 0, axis=1)] # drop zeroed rows
-	np.savetxt(outdir+tag+shortname+".csv", properties, delimiter=',', header='rhoc,'+','.join(props[1:]), comments='')
+	np.savetxt(outdir+tag+shortname+".csv", properties, delimiter=',', header='rhoc,'+','.join([prop for prop in ['pR','M','R','Lambda','I','Mb'] if prop in props[1:]]), comments='')
