@@ -5,6 +5,7 @@ __author__ = 'philippe.landry@ligo.org'
 __date__ = '03-2019'
 
 import numpy as np
+import os
 from optparse import OptionParser
 from scipy.interpolate import interp1d
 from nsstruc.tov import tov
@@ -45,7 +46,7 @@ verb = opts.verbose
 
 for eosname in eosnames:
 
-	shortname = (eosname.split('.')[0]).split('eos-')[-1]
+	shortname = (os.path.basename(eosname).split('.')[0]).split('eos-')[-1]
 	if verb == True: print 'Calculate properties of '+str(shortname)+' stars'
 
 	eospath = indir+eosname
