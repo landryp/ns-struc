@@ -52,7 +52,7 @@ verb = opts.verbose
 for eosname in eosnames:
 
 	shortname = (os.path.basename(eosname).split('.')[0]).split('eos-')[-1]
-	if verb == True: print 'Calculate properties of '+str(shortname)+' stars'
+	if verb == True: print('Calculate properties of '+str(shortname)+' stars')
 
 	eospath = indir+eosname
 	eosdat = np.genfromtxt(eospath,names=True,delimiter=',')
@@ -85,20 +85,20 @@ for eosname in eosnames:
 			idx = idx + 1
 	
 	if opts.mrng:
-		if verb == True: print 'Start at mass {0} Msun'.format(mmin)
+		if verb == True: print('Start at mass {0} Msun'.format(mmin))
 	else:
-		if verb == True: print 'Start at central density {0} g/cm^3'.format(rhocs[0])
+		if verb == True: print('Start at central density {0} g/cm^3'.format(rhocs[0]))
 
-	i = numrhoc/2 - 1 # start at midpoint in rhoc		
-	for rhoc in list(reversed(rhocs[:numrhoc/2])): # compute macroscopic properties for star of each central density
+	i = int(numrhoc/2) - 1 # start at midpoint in rhoc		
+	for rhoc in list(reversed(rhocs[:int(numrhoc/2)])): # compute macroscopic properties for star of each central density
 		macro = tov([mu,P,cs2i,Rho],rhoc,props,idxs,stp,numpts,tol)[1:]
 		if opts.mrng:
 			if macro[0] < mmin: break
 		properties[i] = [item for List in [[rhoc],macro] for item in List]
 		i = i-1
 	
-	i = numrhoc/2 # continue in other direction from midpoint
-	for rhoc in rhocs[len(rhocs)/2:]: # compute macroscopic properties for star of each central density
+	i = int(numrhoc/2) # continue in other direction from midpoint
+	for rhoc in rhocs[int(len(rhocs)/2):]: # compute macroscopic properties for star of each central density
 		macro = tov([mu,P,cs2i,Rho],rhoc,props,idxs,stp,numpts,tol)[1:]
 		if opts.mrng:
 			if macro[0] > mmax: break
@@ -106,9 +106,9 @@ for eosname in eosnames:
 		i = i+1
 
 	if opts.mrng:
-		if verb == True: print 'Done at mass {0} Msun'.format(mmax)
+		if verb == True: print('Done at mass {0} Msun'.format(mmax))
 	else:
-		if verb == True: print 'Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv'
+		if verb == True: print('Done at central density {0} g/cm^3\nSave to '.format(rhocs[-1])+outdir+tag+shortname+'.csv')
 
 	properties = properties[~np.all(properties == 0, axis=1)] # drop zeroed rows
 	np.savetxt(outdir+tag+shortname+".csv", properties, delimiter=',', header='rhoc,'+','.join([prop for prop in ['pR','M','R','Lambda','I','Mb'] if prop in props[1:]]), comments='')
